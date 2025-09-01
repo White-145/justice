@@ -1,11 +1,9 @@
 package me.white.justice.value;
 
-import com.google.gson.stream.JsonWriter;
 import me.white.justice.CompilationException;
 import me.white.justice.lexer.Lexer;
 import me.white.justice.lexer.TokenType;
 
-import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -59,32 +57,5 @@ public class PotionValue implements Value {
     @Override
     public ValueType getType() {
         return ValueType.POTION;
-    }
-
-    @Override
-    public void write(JsonWriter writer) throws IOException {
-        writer.name("potion");
-        writer.value(name);
-        writer.name("amplifier");
-        writer.value(amplifier);
-        writer.name("duration");
-        writer.value(duration);
-    }
-
-    @Override
-    public String toString() {
-        StringBuilder builder = new StringBuilder("potion{ \"");
-        builder.append(name);
-        builder.append("\"");
-        if (amplifier != 0) {
-            builder.append(", amplifier=");
-            builder.append(amplifier);
-        }
-        if (duration >= 0) {
-            builder.append(", duration=");
-            builder.append(duration);
-        }
-        builder.append(" }");
-        return builder.toString();
     }
 }

@@ -68,17 +68,26 @@ public class Parser {
                 lexer.expect(TokenType.BLOCK_CLOSE);
                 yield values;
             }
+            case SELECTOR_OPEN -> {
+                String selector = null;
+                if (!lexer.guess(TokenType.SELECTOR_CLOSE, false)) {
+                    selector = (String)lexer.expect(TokenType.LITERAL).getValue();
+                }
+                lexer.expect(TokenType.SELECTOR_CLOSE);
+                String name = (String)lexer.expectIdentifier().getValue();
+                yield new GameValue(selector, name);
+            }
             default -> throw new CompilationException("Invalid value");
         };
     }
 
-    private Operation parseInstruction() throws CompilationException {
+    private Operation parseOperation() throws CompilationException {
         boolean isInverted = false;
         Token name = lexer.expectIdentifier();
         Token delegate = null;
         String selector = null;
-        Map<String, Value> arguments = null;
-        List<Operation> operations = null;
+        Map<String, Value> arguments = new HashMap<>();
+        List<Operation> operations = new ArrayList<>();
         if (lexer.guessIdentifier(false)) {
             delegate = lexer.expectIdentifier();
         }
@@ -98,7 +107,6 @@ public class Parser {
             lexer.expect(TokenType.SELECTOR_CLOSE);
         }
         if (lexer.guess(TokenType.ARGS_OPEN, true)) {
-            arguments = new HashMap<>();
             while (lexer.canLex() && !lexer.guess(TokenType.ARGS_CLOSE, false)) {
                 String argument = (String)lexer.expect(TokenType.LITERAL).getValue();
                 lexer.expect(TokenType.EQUALS);
@@ -111,9 +119,8 @@ public class Parser {
             lexer.expect(TokenType.ARGS_CLOSE);
         }
         if (lexer.guess(TokenType.BLOCK_OPEN, true)) {
-            operations = new ArrayList<>();
             while (lexer.canLex() && !lexer.guess(TokenType.BLOCK_CLOSE, false)) {
-                operations.add(parseInstruction());
+                operations.add(parseOperation());
             }
             lexer.expect(TokenType.BLOCK_CLOSE);
         } else {
@@ -122,7 +129,7 @@ public class Parser {
         return new Operation(isInverted, (String)name.getValue(), selector, arguments, operations, delegate == null ? null : (String)delegate.getValue());
     }
 
-    private Handler parseFunction() throws CompilationException {
+    private Handler parseHandler() throws CompilationException {
         List<Operation> operations = new ArrayList<>();
         HandlerType type = HandlerType.FUNCTION;
         Token name = lexer.expectIdentifier();
@@ -135,7 +142,7 @@ public class Parser {
         }
         lexer.expect(TokenType.BLOCK_OPEN);
         while (lexer.canLex() && !lexer.guess(TokenType.BLOCK_CLOSE, false)) {
-            operations.add(parseInstruction());
+            operations.add(parseOperation());
         }
         lexer.expect(TokenType.BLOCK_CLOSE);
         return new Handler(type, (String)name.getValue(), operations);
@@ -144,7 +151,7 @@ public class Parser {
     public List<Handler> parse() throws CompilationException {
         List<Handler> handlers = new ArrayList<>();
         while (lexer.canLex()) {
-            handlers.add(parseFunction());
+            handlers.add(parseHandler());
         }
         return handlers;
     }

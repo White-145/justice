@@ -1,9 +1,5 @@
 package me.white.justice.value;
 
-import com.google.gson.stream.JsonWriter;
-
-import java.io.IOException;
-
 public class NumberValue implements Value {
     private final String placeholder;
     private final double number;
@@ -23,21 +19,15 @@ public class NumberValue implements Value {
         return ValueType.NUMBER;
     }
 
-    @Override
-    public void write(JsonWriter writer) throws IOException {
-        writer.name("number");
-        if (placeholder != null) {
-            writer.value(placeholder);
-        } else {
-            writer.value(number);
-        }
+    public boolean isPlaceholder() {
+        return placeholder != null;
     }
 
-    @Override
-    public String toString() {
-        if (placeholder != null) {
-            return placeholder;
-        }
-        return Double.toString(number);
+    public String getPlaceholder() {
+        return placeholder;
+    }
+
+    public double getNumber() {
+        return number;
     }
 }

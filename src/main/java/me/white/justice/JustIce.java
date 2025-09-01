@@ -1,6 +1,5 @@
 package me.white.justice;
 
-import com.google.gson.stream.JsonWriter;
 import me.white.justice.parser.Handler;
 import org.apache.commons.cli.*;
 import org.apache.commons.cli.help.HelpFormatter;
@@ -20,8 +19,6 @@ public class JustIce {
     private static final Option OUT_OPTION = new Option("o", true, "Specifies the output file");
     private static final Option COMPILE_OPTION = new Option("c", "compile", false, "Compiles provided files");
     private static final Option DECOMPILE_OPTION = new Option("d", "decompile", false, "Deompiles provided files");
-    // dry run - do not produce output
-    // parse - parse and output
     private final CommandLine commandLine;
 
     static {
@@ -114,38 +111,21 @@ public class JustIce {
         }
         List<Handler> handlers = new ArrayList<>();
         for (Path path : paths) {
-            String source;
             try {
-                source = Files.readString(path);
+                String source = Files.readString(path);
+                handlers.addAll(Compiler.parse(source));
             } catch (IOException e) {
-                System.err.print("Could not read contents of '" + path + "': ");
+                System.err.print("Could not read file '" + path + "': ");
+                e.printStackTrace();
+                return;
+            } catch (CompilationException e) {
+                System.out.println("Compile error: " + e.getMessage());
                 e.printStackTrace();
                 return;
             }
-            try {
-                handlers.addAll(Compiler.compile(source));
-            } catch (CompilationException e) {
-                System.out.println("Compile error: " + e.getMessage());
-                return;
-            }
         }
-        try (
-                FileWriter file = new FileWriter(out);
-                JsonWriter writer = new JsonWriter(file)
-        ) {
-            writer.beginObject();
-            writer.name("handlers");
-            writer.beginArray();
-            for (int i = 0; i < handlers.size(); ++i) {
-                Handler handler = handlers.get(i);
-                writer.beginObject();
-                writer.name("position");
-                writer.value(i);
-                handler.write(writer);
-                writer.endObject();
-            }
-            writer.endArray();
-            writer.endObject();
+        try (FileWriter file = new FileWriter(out)) {
+            Compiler.write(file, handlers);
         } catch (IOException e) {
             System.err.print("Could not write file '" + out + "': ");
             e.printStackTrace();
@@ -162,17 +142,14 @@ public class JustIce {
             try {
                 source = Files.readString(path);
             } catch (IOException e) {
-                System.err.print("Could not read contents of '" + path + "': ");
+                System.err.print("Could not read file '" + path + "': ");
                 e.printStackTrace();
                 return;
             }
-            handlers.addAll(Decompiler.decompile(source));
+            handlers.addAll(Decompiler.read(source));
         }
         try (FileWriter writer = new FileWriter(out)) {
-            for (Handler handler : handlers) {
-                writer.write(handler.toString());
-                writer.write("\n\n");
-            }
+            Decompiler.write(writer, handlers);
         } catch (IOException e) {
             System.err.print("Could not write file '" + out + "': ");
             e.printStackTrace();

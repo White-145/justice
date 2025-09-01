@@ -1,6 +1,7 @@
 package me.white.justice;
 
 import com.google.gson.*;
+import me.white.justice.lexer.Lexer;
 import me.white.justice.parser.Handler;
 import me.white.justice.parser.HandlerType;
 import me.white.justice.parser.Operation;
@@ -10,10 +11,11 @@ import net.querz.nbt.tag.CompoundTag;
 import net.querz.nbt.tag.Tag;
 
 import java.io.IOException;
+import java.io.Writer;
 import java.util.*;
 
 public class Decompiler {
-    public static List<Handler> decompile(String json) {
+    public static List<Handler> read(String json) {
         JsonObject object = JsonParser.parseString(json).getAsJsonObject();
         List<Handler> functions = new ArrayList<>();
         JsonArray handlers = object.get("handlers").getAsJsonArray();
@@ -50,7 +52,7 @@ public class Decompiler {
         boolean isInverted = false;
         String selector = null;
         Map<String, Value> arguments = new HashMap<>();
-        List<Operation> operations = null;
+        List<Operation> operations = new ArrayList<>();
         if (operation.has("conditional")) {
             JsonObject conditional = operation.get("conditional").getAsJsonObject();
             delegate = conditional.get("action").getAsString();
@@ -75,7 +77,6 @@ public class Decompiler {
             }
         }
         if (operation.has("operations")) {
-            operations = new ArrayList<>();
             JsonArray operationsArray = operation.get("operations").getAsJsonArray();
             for (JsonElement element : operationsArray) {
                 JsonObject operationObject = element.getAsJsonObject();
@@ -173,12 +174,18 @@ public class Decompiler {
                 String name = valueObject.get("sound").getAsString();
                 double pitch = valueObject.get("pitch").getAsDouble();
                 double volume = valueObject.get("volume").getAsDouble();
-                String variant = valueObject.get("variation").getAsString();
-                if (variant.isEmpty()) {
+                String variant = null;
+                String source = null;
+                if (valueObject.has("variation")) {
+                    variant = valueObject.get("variation").getAsString();
+                }
+                if (valueObject.has("source")) {
+                    valueObject.get("source").getAsString();
+                }
+                if (variant != null && variant.isEmpty()) {
                     variant = null;
                 }
-                String source = valueObject.get("source").getAsString();
-                if (source.equals("MASTER")) {
+                if (variant != null && source.equals("MASTER")) {
                     source = null;
                 }
                 yield new SoundValue(name, pitch, volume, variant, source);
@@ -225,5 +232,271 @@ public class Decompiler {
             }
             case ENUM -> new EnumValue(valueObject.get("enum").getAsString());
         };
+    }
+
+    public static void write(Writer writer, List<Handler> handlers) throws IOException {
+        for (Handler handler : handlers) {
+            writeHandler(writer, handler);
+            writer.write("\n");
+        }
+    }
+
+    private static void writeHandler(Writer writer, Handler handler) throws IOException {
+        if (handler.getType() != HandlerType.FUNCTION) {
+            writer.write(handler.getType().getName());
+            writer.write(" ");
+        }
+        writeIdentifier(writer, handler.getName(), false);
+        writer.write(" {\n");
+        for (Operation operation : handler.getOperations()) {
+            writeOperation(writer, operation, 1);
+        }
+        writer.write("}\n");
+    }
+
+    private static void writeIdentifier(Writer writer, String name, boolean force) throws IOException {
+        if (force || name.isEmpty() || !Lexer.isLiteralStart(name.charAt(0))) {
+            force = true;
+        } else {
+            for (char ch : name.toCharArray()) {
+                if (!Lexer.isLiteral(ch)) {
+                    force = true;
+                    break;
+                }
+            }
+        }
+        if (force) {
+            writer.write("`" + name.replace("\n", "\\n").replace("\\", "\\\\").replace("`", "\\`") + "`");
+        } else {
+            writer.write(name);
+        }
+    }
+
+    private static void writeOperation(Writer writer, Operation operation, int level) throws IOException {
+        for (int i = 0; i < level; ++i) {
+            writer.write("    ");
+        }
+        if (operation.hasDelegate()) {
+            writer.write(operation.getName());
+            if (operation.isInverted()) {
+                writer.write(" not");
+            }
+            writer.write(" ");
+            writer.write(operation.getDelegate());
+        } else {
+            if (operation.isInverted()) {
+                writer.write("not ");
+            }
+            writer.write(operation.getName());
+        }
+        if (operation.hasSelector()) {
+            writer.write("<");
+            writer.write(operation.getSelector());
+            writer.write(">");
+        }
+        Map<String, Value> arguments = operation.getArguments();
+        if (!arguments.isEmpty()) {
+            writer.write("(");
+            int i = 0;
+            for (Map.Entry<String, Value> argument : arguments.entrySet()) {
+                writer.write(argument.getKey());
+                writer.write("=");
+                writeValue(writer, argument.getValue());
+                if (i != arguments.size() - 1) {
+                    writer.write(", ");
+                }
+                i += 1;
+            }
+            writer.write(")");
+        }
+        List<Operation> operations = operation.getOperations();
+        if (!operations.isEmpty()) {
+            writer.write(" {");
+            writer.write("\n");
+            for (Operation innerOperation : operations) {
+                writeOperation(writer, innerOperation, level + 1);
+            }
+            for (int i = 0; i < level; ++i) {
+                writer.write("    ");
+            }
+            writer.write("}");
+        } else {
+            writer.write(";");
+        }
+        writer.write("\n");
+    }
+
+    private static void writeValue(Writer writer, Value value) throws IOException {
+        switch (value.getType()) {
+            case NUMBER -> {
+                NumberValue number = (NumberValue)value;
+                if (number.isPlaceholder()) {
+                    writer.write(number.getPlaceholder());
+                } else {
+                    writer.write(Double.toString(number.getNumber()));
+                }
+            }
+            case TEXT -> {
+                TextValue text = (TextValue)value;
+                if (text.getTextParsing() != TextParsing.PLAIN) {
+                    writer.write(text.getTextParsing().getPrefix());
+                }
+                writeString(writer, text.getText());
+            }
+            case ARRAY -> {
+                ArrayValue array = (ArrayValue)value;
+                writer.write("{ ");
+                for (int i = 0; i < array.size(); ++i) {
+                    writeValue(writer, array.get(i));
+                    if (i != array.size() - 1) {
+                        writer.write(", ");
+                    }
+                }
+                if (!array.isEmpty()) {
+                    writer.write(" ");
+                }
+                writer.write("}");
+            }
+            case VARIABLE -> {
+                VariableValue variable = (VariableValue)value;
+                boolean nonLocal = variable.getScope() != VariableScope.LOCAL;
+                if (nonLocal) {
+                    writer.write(variable.getScope().getPrefix());
+                }
+                writeIdentifier(writer, variable.getName(), nonLocal);
+            }
+            case GAME -> {
+                GameValue game = (GameValue)value;
+                writer.write("<");
+                if (game.hasSelector()) {
+                    writer.write(game.getSelector());
+                }
+                writer.write(">");
+                writer.write(game.getName());
+            }
+            case LOCATION -> {
+                LocationValue location = (LocationValue)value;
+                writer.write("location{ ");
+                writeNumber(writer, location.getX());
+                writer.write(", ");
+                writeNumber(writer, location.getY());
+                writer.write(", ");
+                writeNumber(writer, location.getZ());
+                if (location.hasRotation()) {
+                    writer.write(", ");
+                    writeNumber(writer, location.getYaw());
+                    writer.write(", ");
+                    writeNumber(writer, location.getPitch());
+                }
+                writer.write(" }");
+            }
+            case VECTOR -> {
+                VectorValue vector = (VectorValue)value;
+                writer.write("vector{ ");
+                writeNumber(writer, vector.getX());
+                writer.write(", ");
+                writeNumber(writer, vector.getY());
+                writer.write(", ");
+                writeNumber(writer, vector.getZ());
+                writer.write(" }");
+            }
+            case ITEM -> {
+                ItemValue item = (ItemValue)value;
+                writer.write("item");
+                writer.write(item.getItem().valueToString());
+            }
+            case SOUND -> {
+                SoundValue sound = (SoundValue)value;
+                writer.write("sound{ ");
+                writeString(writer, sound.getName());
+                if (sound.getVolume() != 1) {
+                    writer.write(", volume=");
+                    writeNumber(writer, sound.getVolume());
+                }
+                if (sound.getPitch() != 1) {
+                    writer.write(", pitch=");
+                    writeNumber(writer, sound.getPitch());
+                }
+                if (sound.hasSource()) {
+                    writer.write(", source=\"");
+                    writer.write(sound.getSource());
+                    writer.write("\"");
+                }
+                if (sound.hasVariant()) {
+                    writer.write(", variant=\"");
+                    writer.write(sound.getVariant());
+                    writer.write("\"");
+                }
+                writer.write(" }");
+            }
+            case POTION -> {
+                PotionValue potion = (PotionValue)value;
+                writer.write("potion{ ");
+                writeString(writer, potion.getName());
+                if (potion.getAmplifier() != 0) {
+                    writer.write(", amplifier=");
+                    writer.write(Integer.toString(potion.getAmplifier()));
+                }
+                if (potion.getDuration() >= 0) {
+                    writer.write(", duration=");
+                    writer.write(Integer.toString(potion.getDuration()));
+                }
+                writer.write(" }");
+            }
+            case PARTICLE -> {
+                ParticleValue particle = (ParticleValue)value;
+                writer.write("particle{ ");
+                writeString(writer, particle.getName());
+                if (particle.hasMaterial()) {
+                    writer.write(", material=\"");
+                    writer.write(particle.getMaterial());
+                    writer.write("\"");
+                }
+                if (particle.hasSpread()) {
+                    writer.write(", spread={ ");
+                    writeNumber(writer, particle.getSpreadH());
+                    writer.write(", ");
+                    writeNumber(writer, particle.getSpreadV());
+                    writer.write(" }");
+                }
+                if (particle.hasMotion()) {
+                    writer.write(", motion={ ");
+                    writeNumber(writer, particle.getMotionX());
+                    writer.write(", ");
+                    writeNumber(writer, particle.getMotionY());
+                    writer.write(", ");
+                    writeNumber(writer, particle.getMotionZ());
+                    writer.write(" }");
+                }
+                if (particle.getCount() != 1) {
+                    writer.write(", count=");
+                    writer.write(Integer.toString(particle.getCount()));
+                }
+                if (particle.getColor() != 0xFF0000) {
+                    writer.write(String.format(", color=#%06X", particle.getColor()));
+                }
+                if (particle.getSize() != 1) {
+                    writer.write(", size=");
+                    writeNumber(writer, particle.getSize());
+                }
+                writer.write(" }");
+            }
+            case ENUM -> {
+                EnumValue enumValue = (EnumValue)value;
+                writer.write("'");
+                writer.write(enumValue.getName().replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\t", "\\t"));
+                writer.write("'");
+            }
+        }
+    }
+
+    private static void writeString(Writer writer, String string) throws IOException {
+        writer.write("\"");
+        writer.write(string.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\t", "\\t"));
+        writer.write("\"");
+    }
+
+    private static void writeNumber(Writer writer, double number) throws IOException {
+        writer.write(Double.toString((double)Math.round(number * 1000) / 1000));
     }
 }

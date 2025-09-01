@@ -14,7 +14,7 @@ public enum ValueType {
     PARTICLE("particle"),
     ENUM("enum");
 
-    public final String name;
+    final String name;
 
     ValueType(String name) {
         this.name = name;
@@ -27,5 +27,9 @@ public enum ValueType {
             }
         }
         return null;
+    }
+
+    public String getName() {
+        return name;
     }
 }

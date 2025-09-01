@@ -1,11 +1,8 @@
 package me.white.justice.value;
 
-import com.google.gson.stream.JsonWriter;
 import me.white.justice.CompilationException;
 import me.white.justice.lexer.Lexer;
 import me.white.justice.lexer.TokenType;
-
-import java.io.IOException;
 
 public class VectorValue implements Value {
     private final double x;
@@ -44,20 +41,5 @@ public class VectorValue implements Value {
     @Override
     public ValueType getType() {
         return ValueType.VECTOR;
-    }
-
-    @Override
-    public void write(JsonWriter writer) throws IOException {
-        writer.name("x");
-        writer.value(x);
-        writer.name("y");
-        writer.value(y);
-        writer.name("z");
-        writer.value(z);
-    }
-
-    @Override
-    public String toString() {
-        return "vector{ " + x + " " + y + " " + z + " }";
     }
 }

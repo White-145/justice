@@ -19,4 +19,8 @@ public enum HandlerType {
         }
         return null;
     }
+
+    public String getName() {
+        return name;
+    }
 }

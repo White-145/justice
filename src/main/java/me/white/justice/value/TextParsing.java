@@ -32,8 +32,11 @@ public enum TextParsing {
         return null;
     }
 
-    @Override
-    public String toString() {
+    public char getPrefix() {
+        return prefix;
+    }
+
+    public String getName() {
         return name;
     }
 }

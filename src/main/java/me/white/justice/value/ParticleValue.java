@@ -1,11 +1,9 @@
 package me.white.justice.value;
 
-import com.google.gson.stream.JsonWriter;
 import me.white.justice.CompilationException;
 import me.white.justice.lexer.Lexer;
 import me.white.justice.lexer.TokenType;
 
-import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -87,8 +85,16 @@ public class ParticleValue implements Value {
         return name;
     }
 
+    public boolean hasMaterial() {
+        return material != null;
+    }
+
     public String getMaterial() {
         return material;
+    }
+
+    public boolean hasSpread() {
+        return spreadH != 0 || spreadV != 0;
     }
 
     public double getSpreadH() {
@@ -97,6 +103,10 @@ public class ParticleValue implements Value {
 
     public double getSpreadV() {
         return spreadV;
+    }
+
+    public boolean hasMotion() {
+        return motionX != 0 || motionY != 0 || motionZ != 0;
     }
 
     public double getMotionX() {
@@ -126,72 +136,5 @@ public class ParticleValue implements Value {
     @Override
     public ValueType getType() {
         return ValueType.PARTICLE;
-    }
-
-    @Override
-    public void write(JsonWriter writer) throws IOException {
-        writer.name("particle_type");
-        writer.value(name);
-        if (material != null) {
-            writer.name("material");
-            writer.value(material);
-        }
-        writer.name("count");
-        writer.value(count);
-        writer.name("first_spread");
-        writer.value(spreadH);
-        writer.name("second_spread");
-        writer.value(spreadV);
-        writer.name("x_motion");
-        writer.value(motionX);
-        writer.name("y_motion");
-        writer.value(motionY);
-        writer.name("z_motion");
-        writer.value(motionZ);
-        writer.name("color");
-        writer.value(color);
-        writer.name("size");
-        writer.value(size);
-    }
-
-    @Override
-    public String toString() {
-        StringBuilder builder = new StringBuilder("particle{ \"");
-        builder.append(name);
-        builder.append("\"");
-        if (material != null) {
-            builder.append(", material=\"");
-            builder.append(material);
-            builder.append("\"");
-        }
-        if (spreadH != 0 || spreadV != 0) {
-            builder.append(", spread={ ");
-            builder.append(spreadH);
-            builder.append(", ");
-            builder.append(spreadV);
-            builder.append(" }");
-        }
-        if (motionX != 0 || motionY != 0 || motionZ != 0) {
-            builder.append(", motion={ ");
-            builder.append(motionX);
-            builder.append(", ");
-            builder.append(motionY);
-            builder.append(", ");
-            builder.append(motionZ);
-            builder.append(" }");
-        }
-        if (count != 1) {
-            builder.append(", count=");
-            builder.append(count);
-        }
-        if (color != 0xFF0000) {
-            builder.append(String.format(", color=#%06X", color));
-        }
-        if (size != 1) {
-            builder.append(", size=");
-            builder.append(size);
-        }
-        builder.append(" }");
-        return builder.toString();
     }
 }
