@@ -1,9 +1,6 @@
 package me.white.justice.value;
 
 import com.google.gson.stream.JsonWriter;
-import me.white.justice.CompilationException;
-import me.white.justice.lexer.Lexer;
-import me.white.justice.lexer.TokenType;
 
 import java.io.IOException;
 import java.io.Writer;
@@ -17,17 +14,6 @@ public class VectorValue implements Value {
         this.x = x;
         this.y = y;
         this.z = z;
-    }
-
-    public static Value parse(Lexer lexer) throws CompilationException {
-        lexer.expect(TokenType.BLOCK_OPEN);
-        double x = (double)lexer.expect(TokenType.NUMBER).getValue();
-        lexer.expect(TokenType.COMMA);
-        double y = (double)lexer.expect(TokenType.NUMBER).getValue();
-        lexer.expect(TokenType.COMMA);
-        double z = (double)lexer.expect(TokenType.NUMBER).getValue();
-        lexer.expect(TokenType.BLOCK_CLOSE);
-        return new VectorValue(x, y, z);
     }
 
     public double getX() {

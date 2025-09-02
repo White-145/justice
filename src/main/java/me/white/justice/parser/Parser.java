@@ -27,7 +27,7 @@ public class Parser {
                     char prefix = name.charAt(0);
                     Token next = lexer.peek();
                     if (next.isOf(TokenType.STRING)) {
-                        lexer.skip(1);
+                        lexer.read();
                         TextParsing parsing = TextParsing.byPrefix(prefix);
                         if (parsing == null) {
                             throw new CompilationException("Invalid text parsing '" + prefix + "'");
@@ -35,7 +35,7 @@ public class Parser {
                         yield new TextValue(parsing, (String)next.getValue());
                     }
                     if (next.isOf(TokenType.IDENTIFIER)) {
-                        lexer.skip(1);
+                        lexer.read();
                         VariableScope scope = VariableScope.byPrefix(prefix);
                         if (scope == null) {
                             throw new CompilationException("Invalid variable scope '" + prefix + "'");
@@ -43,9 +43,9 @@ public class Parser {
                         yield new VariableValue(scope, (String)next.getValue());
                     }
                 }
-                FactoryValue factory = FactoryValue.byName(name);
-                if (factory != null && lexer.guess(TokenType.BLOCK_OPEN, false)) {
-                    yield factory.parse(lexer);
+                ValueType type = ValueType.byName(name);
+                if (type != null && type.isFactory() && lexer.peek().isOf(TokenType.BLOCK_OPEN)) {
+                    yield type.read(lexer);
                 }
                 yield new VariableValue(VariableScope.LOCAL, name);
             }
@@ -59,9 +59,9 @@ public class Parser {
                     throw new CompilationException("Cannot recurse list values");
                 }
                 ArrayValue values = new ArrayValue();
-                while (lexer.canLex() && !lexer.guess(TokenType.BLOCK_CLOSE, false)) {
+                while (lexer.hasNext() && !lexer.peek().isOf(TokenType.BLOCK_CLOSE)) {
                     values.add(parseValue(false));
-                    if (!lexer.guess(TokenType.BLOCK_CLOSE, false)) {
+                    if (!lexer.peek().isOf(TokenType.BLOCK_CLOSE)) {
                         lexer.expect(TokenType.COMMA);
                     }
                 }
@@ -70,7 +70,7 @@ public class Parser {
             }
             case SELECTOR_OPEN -> {
                 String selector = null;
-                if (!lexer.guess(TokenType.SELECTOR_CLOSE, false)) {
+                if (!lexer.peek().isOf(TokenType.SELECTOR_CLOSE)) {
                     selector = (String)lexer.expect(TokenType.LITERAL).getValue();
                 }
                 lexer.expect(TokenType.SELECTOR_CLOSE);
@@ -88,7 +88,7 @@ public class Parser {
         String selector = null;
         Map<String, Value> arguments = new HashMap<>();
         List<Operation> operations = new ArrayList<>();
-        if (lexer.guessIdentifier(false)) {
+        if (lexer.peek().getType().isIdentifier()) {
             delegate = lexer.expectIdentifier();
         }
         if (name.isOf(TokenType.LITERAL) && name.getValue().equals("not")) {
@@ -102,24 +102,27 @@ public class Parser {
             isInverted = true;
             delegate = lexer.expectIdentifier();
         }
-        if (lexer.guess(TokenType.SELECTOR_OPEN, true)) {
+        if (lexer.peek().isOf(TokenType.SELECTOR_OPEN)) {
+            lexer.read();
             selector = (String)lexer.expect(TokenType.LITERAL).getValue();
             lexer.expect(TokenType.SELECTOR_CLOSE);
         }
-        if (lexer.guess(TokenType.ARGS_OPEN, true)) {
-            while (lexer.canLex() && !lexer.guess(TokenType.ARGS_CLOSE, false)) {
+        if (lexer.peek().isOf(TokenType.ARGS_OPEN)) {
+            lexer.read();
+            while (lexer.hasNext() && !lexer.peek().isOf(TokenType.ARGS_CLOSE)) {
                 String argument = (String)lexer.expect(TokenType.LITERAL).getValue();
                 lexer.expect(TokenType.EQUALS);
                 Value value = parseValue(true);
                 arguments.put(argument, value);
-                if (!lexer.guess(TokenType.ARGS_CLOSE, false)) {
+                if (!lexer.peek().isOf(TokenType.ARGS_CLOSE)) {
                     lexer.expect(TokenType.COMMA);
                 }
             }
             lexer.expect(TokenType.ARGS_CLOSE);
         }
-        if (lexer.guess(TokenType.BLOCK_OPEN, true)) {
-            while (lexer.canLex() && !lexer.guess(TokenType.BLOCK_CLOSE, false)) {
+        if (lexer.peek().isOf(TokenType.BLOCK_OPEN)) {
+            lexer.read();
+            while (lexer.hasNext() && !lexer.peek().isOf(TokenType.BLOCK_CLOSE)) {
                 operations.add(parseOperation());
             }
             lexer.expect(TokenType.BLOCK_CLOSE);
@@ -141,7 +144,7 @@ public class Parser {
             }
         }
         lexer.expect(TokenType.BLOCK_OPEN);
-        while (lexer.canLex() && !lexer.guess(TokenType.BLOCK_CLOSE, false)) {
+        while (lexer.hasNext() && !lexer.peek().isOf(TokenType.BLOCK_CLOSE)) {
             operations.add(parseOperation());
         }
         lexer.expect(TokenType.BLOCK_CLOSE);
@@ -150,7 +153,7 @@ public class Parser {
 
     public List<Handler> parse() throws CompilationException {
         List<Handler> handlers = new ArrayList<>();
-        while (lexer.canLex()) {
+        while (lexer.hasNext()) {
             handlers.add(parseHandler());
         }
         return handlers;

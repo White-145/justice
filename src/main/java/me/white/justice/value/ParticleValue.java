@@ -1,14 +1,9 @@
 package me.white.justice.value;
 
 import com.google.gson.stream.JsonWriter;
-import me.white.justice.CompilationException;
-import me.white.justice.lexer.Lexer;
-import me.white.justice.lexer.TokenType;
 
 import java.io.IOException;
 import java.io.Writer;
-import java.util.HashSet;
-import java.util.Set;
 
 public class ParticleValue implements Value {
     private final String name;
@@ -33,55 +28,6 @@ public class ParticleValue implements Value {
         this.count = count;
         this.color = color;
         this.size = size;
-    }
-
-    public static Value parse(Lexer lexer) throws CompilationException {
-        lexer.expect(TokenType.BLOCK_OPEN);
-        String name = (String)lexer.expect(TokenType.STRING).getValue();
-        String material = null;
-        double spreadH = 0;
-        double spreadV = 0;
-        double motionX = 0;
-        double motionY = 0;
-        double motionZ = 0;
-        int count = 1;
-        int color = 0xFF0000;
-        double size = 1;
-        Set<String> seenComponents = new HashSet<>();
-        while (lexer.canLex() && !lexer.guess(TokenType.BLOCK_CLOSE, false)) {
-            lexer.expect(TokenType.COMMA);
-            String component = (String)lexer.expect(TokenType.LITERAL).getValue();
-            if (seenComponents.contains(component)) {
-                throw new CompilationException("Duplicate particle component '" + component + "'");
-            }
-            seenComponents.add(component);
-            lexer.expect(TokenType.EQUALS);
-            switch (component) {
-                case "material" -> material = (String)lexer.expect(TokenType.STRING).getValue();
-                case "spread" -> {
-                    lexer.expect(TokenType.BLOCK_OPEN);
-                    spreadH = (double)lexer.expect(TokenType.NUMBER).getValue();
-                    lexer.expect(TokenType.COMMA);
-                    spreadV = (double)lexer.expect(TokenType.NUMBER).getValue();
-                    lexer.expect(TokenType.BLOCK_CLOSE);
-                }
-                case "motion" -> {
-                    lexer.expect(TokenType.BLOCK_OPEN);
-                    motionX = (double)lexer.expect(TokenType.NUMBER).getValue();
-                    lexer.expect(TokenType.COMMA);
-                    motionY = (double)lexer.expect(TokenType.NUMBER).getValue();
-                    lexer.expect(TokenType.COMMA);
-                    motionZ = (double)lexer.expect(TokenType.NUMBER).getValue();
-                    lexer.expect(TokenType.BLOCK_CLOSE);
-                }
-                case "count" -> count = (int)lexer.expect(TokenType.NUMBER).getValue();
-                case "color" -> color = (int)lexer.expect(TokenType.COLOR).getValue();
-                case "size" -> size = (double)lexer.expect(TokenType.NUMBER).getValue();
-                default -> throw new CompilationException("Invalid particle component '" + component + "'");
-            }
-        }
-        lexer.expect(TokenType.BLOCK_CLOSE);
-        return new ParticleValue(name, material, spreadH, spreadV, motionX, motionY, motionZ, count, color, size);
     }
 
     public String getName() {

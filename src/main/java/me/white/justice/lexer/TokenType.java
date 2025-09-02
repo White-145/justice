@@ -1,32 +1,46 @@
 package me.white.justice.lexer;
 
 public enum TokenType {
-    LITERAL(true, "literal"), // keyword
-    IDENTIFIER(true, "identifier"), // `identifier`
+    LITERAL("literal"), // keyword
+    IDENTIFIER("identifier"), // `identifier`
 
-    STRING(false, "string"), // "string"
-    NUMBER(false, "number"), // 123.456
-    PLACEHOLDER(false, "placeholder"), // %placeholder%
-    COLOR(false, "color"), // #6495ED
-    ENUM(false, "enum"), // 'enum'
+    STRING("string"), // "string"
+    NUMBER("number"), // 123.456
+    PLACEHOLDER("placeholder"), // %placeholder%
+    COLOR("color"), // #6495ED
+    ENUM("enum"), // 'enum'
 
-    BLOCK_OPEN(false, "'{'"), // '{'
-    BLOCK_CLOSE(false, "'}'"), // '}'
-    ARGS_OPEN(false, "'('"), // '('
-    ARGS_CLOSE(false, "')'"), // ')'
-    SELECTOR_OPEN(false, "'<'"), // '<'
-    SELECTOR_CLOSE(false, "'>'"), // '>'
-    COMMA(false, "','"), // ','
-    EQUALS(false, "'='"), // '='
-    EOL(false, "';'"), // ';'
+    BLOCK_OPEN("'{'"), // '{'
+    BLOCK_CLOSE("'}'"), // '}'
+    ARGS_OPEN("'('"), // '('
+    ARGS_CLOSE("')'"), // ')'
+    SELECTOR_OPEN("'<'"), // '<'
+    SELECTOR_CLOSE("'>'"), // '>'
+    COMMA("','"), // ','
+    EQUALS("'='"), // '='
+    EOL("';'"), // ';'
 
-    EOF(false, "");
+    EOF("<eof>");
 
-    final boolean isIdentifier;
     final String representation;
 
-    TokenType(boolean isIdentifier, String representation) {
-        this.isIdentifier = isIdentifier;
+    TokenType(String representation) {
         this.representation = representation;
+    }
+
+    public boolean isIdentifier() {
+        return this == LITERAL || this == IDENTIFIER;
+    }
+
+    public boolean isString() {
+        return this == LITERAL || this == IDENTIFIER || this == STRING || this == PLACEHOLDER || this == ENUM;
+    }
+
+    public boolean isNumber() {
+        return this == NUMBER || this == COLOR;
+    }
+
+    public boolean isInteger() {
+        return this == COLOR;
     }
 }

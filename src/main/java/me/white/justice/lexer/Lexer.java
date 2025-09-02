@@ -2,19 +2,33 @@ package me.white.justice.lexer;
 
 import me.white.justice.CompilationException;
 
-import java.util.Stack;
+import java.util.HashMap;
+import java.util.Map;
 
 public class Lexer {
-    private final Stack<Token> pending = new Stack<>();
+    private static final Map<Character, TokenType> SIMPLE_TOKENS = new HashMap<>();
     private final String buffer;
-    private Token eofToken = null;
+    private Token pending;
+    private Token eof = null;
     private int pos = -1;
     private int row = 0;
     private int column = 0;
 
+    static {
+        SIMPLE_TOKENS.put('{', TokenType.BLOCK_OPEN);
+        SIMPLE_TOKENS.put('}', TokenType.BLOCK_CLOSE);
+        SIMPLE_TOKENS.put('(', TokenType.ARGS_OPEN);
+        SIMPLE_TOKENS.put(')', TokenType.ARGS_CLOSE);
+        SIMPLE_TOKENS.put('<', TokenType.SELECTOR_OPEN);
+        SIMPLE_TOKENS.put('>', TokenType.SELECTOR_CLOSE);
+        SIMPLE_TOKENS.put(',', TokenType.COMMA);
+        SIMPLE_TOKENS.put('=', TokenType.EQUALS);
+        SIMPLE_TOKENS.put(';', TokenType.EOL);
+    }
+
     public Lexer(String buffer) {
-        this.buffer = buffer;
-        advance();
+        this.buffer = buffer.replace("\r\n", "\n");
+        advance(1);
     }
 
     public static boolean isLiteralStart(char ch) {
@@ -38,149 +52,135 @@ public class Lexer {
     }
 
     public int getPos() {
-        if (!pending.isEmpty()) {
-            return pending.getFirst().getPos();
+        return pos;
+    }
+
+    public int getRow() {
+        return row;
+    }
+
+    public int getColumn() {
+        return column;
+    }
+
+    public int getReadPos() {
+        if (pending != null) {
+            return pending.getPos();
         }
         return pos;
     }
 
-    public boolean canRead() {
+    public int getReadRow() {
+        if (pending != null) {
+            return pending.getRow();
+        }
+        return pos;
+    }
+
+    public int getReadColumn() {
+        if (pending != null) {
+            return pending.getColumn();
+        }
+        return column;
+    }
+
+    public void advance(int advance) {
+        pos += advance;
+    }
+
+    public void advanceFrom(int start) {
+        int advance = pos - start;
+        pos = start;
+        advance(advance);
+    }
+
+    private boolean canRead() {
         return pos < buffer.length();
     }
 
-    public void advance() {
+    public boolean hasNext() {
+        if (pending != null) {
+            return true;
+        }
+        return canRead();
+    }
+
+    private void skipWhitespace() {
         if (!canRead()) {
             return;
-        }
-        if (pos != -1 && buffer.charAt(pos) == '\n') {
-            row += 1;
-            column = 0;
-        }
-        pos += 1;
-        column += 1;
-    }
-
-    public void advanceReader(int i) {
-        if (!pending.isEmpty()) {
-            Token first = pending.getFirst();
-            pos = first.getPos();
-            row = first.getRow();
-            column = first.getColumn();
-            pending.clear();
-        }
-        if (!canRead()) {
-            return;
-        }
-        int end = pos;
-        while ((end = buffer.indexOf('\n', end, pos + i) + 1) != 0) {
-            row += 1;
-            column = 0;
-        }
-        pos += i;
-        column += i;
-    }
-
-    public void skipWhitespace() {
-        while (canRead() && isWhitespace(buffer.charAt(pos))) {
-            advance();
-            // skip comments
-            if (pos + 2 < buffer.length() && buffer.charAt(pos) == '/' && buffer.charAt(pos + 1) == '/') {
-                pos = buffer.indexOf('\n', pos) + 1;
-                row += 1;
-                column = 0;
-            }
-        }
-    }
-
-    private String readIdentifier() throws CompilationException {
-        skipWhitespace();
-        if (!canRead() || (!isLiteralStart(buffer.charAt(pos)) && buffer.charAt(pos) != '`')) {
-            throw new CompilationException("No identifier");
-        }
-        if (buffer.charAt(pos) == '`') {
-            advance();
-            StringBuilder builder = new StringBuilder();
-            while (canRead() && buffer.charAt(pos) != '`') {
-                char ch = buffer.charAt(pos);
-                if (ch == '\\') {
-                    advance();
-                    if (!canRead()) {
-                        throw new CompilationException("Incomplete escape sequence");
-                    }
-                    ch = buffer.charAt(pos);
-                    if (ch != '`' && ch != '\\') {
-                        throw new CompilationException("Invalid escape sequence");
-                    }
-                }
-                builder.append(ch);
-                advance();
-            }
-            if (!canRead() || buffer.charAt(pos) != '`') {
-                throw new CompilationException("Incomplete identifier");
-            }
-            advance();
-            return builder.toString();
         }
         int start = pos;
-        while (canRead() && isLiteral(buffer.charAt(pos))) {
+        while (canRead() && isWhitespace(buffer.charAt(pos))) {
             pos += 1;
-            column += 1;
         }
-        return buffer.substring(start, pos);
+        advanceFrom(start);
     }
 
-    private String readString() throws CompilationException {
-        skipWhitespace();
-        if (!canRead() || buffer.charAt(pos) != '"') {
-            throw new CompilationException("No string");
-        }
-        advance();
+    private String readEnclosed(char close, String name) throws CompilationException {
+        int start = pos;
+        pos += 1;
         StringBuilder builder = new StringBuilder();
-        while (canRead() && buffer.charAt(pos) != '"') {
+        while (canRead() && buffer.charAt(pos) != close) {
             char ch = buffer.charAt(pos);
+            if (ch == '\n') {
+                break;
+            }
             if (ch == '\\') {
-                advance();
+                pos += 1;
                 if (!canRead()) {
                     throw new CompilationException("Incomplete escape sequence");
                 }
-                ch = switch (buffer.charAt(pos)) {
-                    case 'n' -> '\n';
-                    case 't' -> '\t';
-                    case '"' -> '"';
-                    case '\\' -> '\\';
-                    default -> throw new CompilationException("Invalid escape sequence");
-                };
+                ch = buffer.charAt(pos);
+                if (ch == '\n') {
+                    pos += 1;
+                    continue;
+                }
+                if (ch != close && ch != '\\') {
+                    throw new CompilationException("Invalid escape sequence");
+                }
             }
             builder.append(ch);
-            advance();
+            pos += 1;
         }
-        if (!canRead() || buffer.charAt(pos) != '"') {
-            throw new CompilationException("Incomplete string");
+        if (!canRead() || buffer.charAt(pos) != close) {
+            throw new CompilationException("Incomplete " + name);
         }
-        advance();
+        pos += 1;
+        advanceFrom(start);
         return builder.toString();
     }
 
-    private double readNumber() throws CompilationException {
-        skipWhitespace();
-        if (!canRead() || !isNumberStart(buffer.charAt(pos))) {
-            throw new CompilationException("No number");
+    private String readLiteral() {
+        int start = pos;
+        while (canRead() && isLiteral(buffer.charAt(pos))) {
+            pos += 1;
         }
+        String literal = buffer.substring(start, pos);
+        advanceFrom(start);
+        return literal;
+    }
+
+    private double readNumber() throws CompilationException {
         int start = pos;
         char ch = buffer.charAt(pos);
         if (ch == '-' || ch == '+') {
-            advance();
+            pos += 1;
         }
         boolean hasDot = false;
+        boolean hasE = false;
         while (canRead()) {
             ch = buffer.charAt(pos);
             if (ch == '.') {
-                if (hasDot) {
+                if (hasDot || hasE) {
                     break;
                 }
                 hasDot = true;
             } else if (ch == 'e' || ch == 'E') {
-                advance();
+                if (hasE) {
+                    break;
+                }
+                hasE = true;
+                pos += 1;
                 if (!canRead()) {
                     throw new CompilationException("Incomplete number");
                 }
@@ -191,10 +191,14 @@ public class Lexer {
             } else if (ch < '0' || ch > '9') {
                 break;
             }
-            advance();
+            pos += 1;
         }
         try {
-            return Double.parseDouble(buffer.substring(start, pos));
+            double number = Double.parseDouble(buffer.substring(start, pos));
+            int advance = pos - start;
+            pos = start;
+            advance(advance);
+            return number;
         } catch (NumberFormatException e) {
             throw new CompilationException("Invalid number: " + e.getMessage());
         }
@@ -203,7 +207,7 @@ public class Lexer {
     private String readPlaceholder() throws CompilationException {
         int start = pos;
         int depth = 0;
-        advance();
+        pos += 1;
         while (canRead()) {
             char ch = buffer.charAt(pos);
             if (ch == '(') {
@@ -218,18 +222,21 @@ public class Lexer {
             if ((ch == ')' || ch == '%') && depth == 0) {
                 break;
             }
-            advance();
+            pos += 1;
         }
         if (!canRead()) {
             throw new CompilationException("Incomplete placeholder");
         }
-        advance();
-        return buffer.substring(start, pos);
+        pos += 1;
+        String placeholder = buffer.substring(start, pos);
+        advanceFrom(start);
+        return placeholder;
     }
 
     private int readColor() throws CompilationException {
+        int start = pos;
         int color = 0;
-        advance();
+        pos += 1;
         for (int i = 0; i < 6; ++i) {
             if (!canRead()) {
                 throw new CompilationException("Incomplete color");
@@ -245,161 +252,75 @@ public class Lexer {
             } else {
                 throw new CompilationException("Invalid color component");
             }
-            advance();
+            pos += 1;
         }
+        advanceFrom(start);
         return color;
-    }
-
-    private String readEnum() throws CompilationException {
-        skipWhitespace();
-        if (!canRead() || buffer.charAt(pos) != '\'') {
-            throw new CompilationException("No enum");
-        }
-        advance();
-        StringBuilder builder = new StringBuilder();
-        while (canRead() && buffer.charAt(pos) != '\'') {
-            char ch = buffer.charAt(pos);
-            if (ch == '\\') {
-                advance();
-                if (!canRead()) {
-                    throw new CompilationException("Incomplete escape sequence");
-                }
-                ch = switch (buffer.charAt(pos)) {
-                    case 'n' -> '\n';
-                    case 't' -> '\t';
-                    case '\'' -> '\'';
-                    case '\\' -> '\\';
-                    default -> throw new CompilationException("Invalid escape sequence");
-                };
-            }
-            builder.append(ch);
-            advance();
-        }
-        if (!canRead() || buffer.charAt(pos) != '\'') {
-            throw new CompilationException("Incomplete enum");
-        }
-        advance();
-        return builder.toString();
-    }
-
-    private Token eof() {
-        if (eofToken == null) {
-            eofToken = new Token(TokenType.EOF, null, pos, row, column);
-        }
-        return eofToken;
-    }
-
-    private Token tokenSingle(TokenType type, int pos, int row, int column) {
-        advance();
-        return new Token(type, null, pos, row, column);
     }
 
     private Token next() throws CompilationException {
         skipWhitespace();
         if (!canRead()) {
-            return eof();
+            if (eof == null) {
+                eof = new Token(TokenType.EOF, null, pos, row, column);
+            }
+            return eof;
         }
         int pos = this.pos;
         int row = this.row;
         int column = this.column;
-        return switch (buffer.charAt(pos)) {
-            case '{' -> tokenSingle(TokenType.BLOCK_OPEN, pos, row, column);
-            case '}' -> tokenSingle(TokenType.BLOCK_CLOSE, pos, row, column);
-            case '(' -> tokenSingle(TokenType.ARGS_OPEN, pos, row, column);
-            case ')' -> tokenSingle(TokenType.ARGS_CLOSE, pos, row, column);
-            case '<' -> tokenSingle(TokenType.SELECTOR_OPEN, pos, row, column);
-            case '>' -> tokenSingle(TokenType.SELECTOR_CLOSE, pos, row, column);
-            case ',' -> tokenSingle(TokenType.COMMA, pos, row, column);
-            case '=' -> tokenSingle(TokenType.EQUALS, pos, row, column);
-            case ';' -> tokenSingle(TokenType.EOL, pos, row, column);
-            case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '-', '.' -> new Token(TokenType.NUMBER, readNumber(), pos, row, column);
+        char ch = buffer.charAt(pos);
+        if (SIMPLE_TOKENS.containsKey(ch)) {
+            advance(1);
+            return new Token(SIMPLE_TOKENS.get(ch), null, pos, row, column);
+        }
+        if (isNumberStart(ch)) {
+            return new Token(TokenType.NUMBER, readNumber(), pos, row, column);
+        }
+        if (isLiteralStart(ch)) {
+            return new Token(TokenType.LITERAL, readLiteral(), pos, row, column);
+        }
+        Token token = switch (ch) {
+            case '"' -> new Token(TokenType.STRING, readEnclosed('"', "string"), pos, row, column);
+            case '`' -> new Token(TokenType.IDENTIFIER, readEnclosed('`', "identifier"), pos, row, column);
+            case '\'' -> new Token(TokenType.ENUM, readEnclosed('\'', "enum"), pos, row, column);
             case '%' -> new Token(TokenType.PLACEHOLDER, readPlaceholder(), pos, row, column);
             case '#' -> new Token(TokenType.COLOR, readColor(), pos, row, column);
-            case '\'' -> new Token(TokenType.ENUM, readEnum(), pos, row, column);
-            case '"' -> new Token(TokenType.STRING, readString(), pos, row, column);
-            case '`' -> new Token(TokenType.IDENTIFIER, readIdentifier(), pos, row, column);
-            default -> new Token(TokenType.LITERAL, readIdentifier(), pos, row, column);
+            default -> throw new CompilationException("Invalid token");
         };
-    }
-
-    public boolean canLex() throws CompilationException {
-        return !pending.isEmpty() || !peek().isOf(TokenType.EOF);
-    }
-
-    public Token peek(int offset) throws CompilationException {
-        if (offset < pending.size()) {
-            return pending.get(offset);
-        }
-        for (int i = pending.size(); i < offset; ++i) {
-            Token token = next();
-            if (token.isOf(TokenType.EOF)) {
-                return token;
-            }
-            pending.add(token);
-        }
-        Token token = next();
-        if (!token.isOf(TokenType.EOF)) {
-            pending.add(token);
-        }
+        skipWhitespace();
         return token;
     }
 
     public Token peek() throws CompilationException {
-        return peek(0);
+        if (pending == null) {
+            pending = next();
+        }
+        return pending;
     }
 
     public Token read() throws CompilationException {
-        if (!pending.isEmpty()) {
-            return pending.pop();
+        if (pending == null) {
+            return next();
         }
-        return next();
-    }
-
-    public void skip(int n) throws CompilationException {
-        if (pending.size() > n) {
-            for (int i = n; i < pending.size(); ++i) {
-                pending.pop();
-            }
-            return;
-        }
-        n -= pending.size();
-        pending.clear();
-        for (int i = 0; i < n; ++i) {
-            if (next().isOf(TokenType.EOF)) {
-                break;
-            }
-        }
-    }
-
-    public boolean guess(TokenType type, boolean skip) throws CompilationException {
-        boolean guessed = peek().isOf(type);
-        if (guessed && skip) {
-            skip(1);
-        }
-        return guessed;
-    }
-
-    public boolean guessIdentifier(boolean skip) throws CompilationException {
-        boolean guessed = peek().isIdentifier();
-        if (guessed && skip) {
-            skip(1);
-        }
-        return guessed;
+        Token token = pending;
+        pending = null;
+        return token;
     }
 
     public Token expect(TokenType type) throws CompilationException {
         Token token = peek();
         if (!token.isOf(type)) {
-            throw new CompilationException("Expected " + type.representation + ", got " + token.getType().representation);
+            throw new CompilationException("Expected " + type + ", got " + token.getType());
         }
-        return read();
+        return token;
     }
 
     public Token expectIdentifier() throws CompilationException {
         Token token = peek();
-        if (!token.isIdentifier()) {
-            throw new CompilationException("Expected identifier, got " + token.getType().representation);
+        if (!token.getType().isIdentifier()) {
+            throw new CompilationException("Expected identifier-like, got " + token.getType());
         }
-        return read();
+        return token;
     }
 }

@@ -106,7 +106,7 @@ public class Decompiler {
             }
             return array;
         }
-        return type.decompile(value);
+        return type.readJson(value);
     }
 
     public void write(Writer writer) throws IOException {
