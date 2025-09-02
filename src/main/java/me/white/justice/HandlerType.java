@@ -1,4 +1,4 @@
-package me.white.justice.parser;
+package me.white.justice;
 
 public enum HandlerType {
     FUNCTION("function"),

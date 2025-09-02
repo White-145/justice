@@ -32,11 +32,6 @@ public class NumberValue implements Value {
     }
 
     @Override
-    public ValueType getType() {
-        return ValueType.NUMBER;
-    }
-
-    @Override
     public void write(Writer writer) throws IOException {
         if (isPlaceholder()) {
             writer.write(placeholder);
@@ -49,7 +44,7 @@ public class NumberValue implements Value {
     public void writeJson(JsonWriter writer) throws IOException {
         writer.beginObject();
         writer.name("type");
-        writer.value(getType().getName());
+        writer.value(ValueType.NUMBER.getName());
         writer.name("number");
         if (isPlaceholder()) {
             writer.value(placeholder);

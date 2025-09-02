@@ -35,8 +35,6 @@ public interface Value {
         writer.write(Double.toString((double)Math.round(number * 1000) / 1000));
     }
 
-    ValueType getType();
-
     void write(Writer writer) throws IOException;
 
     void writeJson(JsonWriter writer) throws IOException;

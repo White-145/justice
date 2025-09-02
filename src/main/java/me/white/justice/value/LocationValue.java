@@ -45,11 +45,6 @@ public class LocationValue implements Value {
     }
 
     @Override
-    public ValueType getType() {
-        return ValueType.LOCATION;
-    }
-
-    @Override
     public void write(Writer writer) throws IOException {
         writer.write("location{ ");
         Value.writeNumber(writer, x);
@@ -70,7 +65,7 @@ public class LocationValue implements Value {
     public void writeJson(JsonWriter writer) throws IOException {
         writer.beginObject();
         writer.name("type");
-        writer.value(getType().getName());
+        writer.value(ValueType.LOCATION.getName());
         writer.name("x");
         writer.value(x);
         writer.name("y");

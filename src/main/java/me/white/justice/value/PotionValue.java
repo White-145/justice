@@ -29,11 +29,6 @@ public class PotionValue implements Value {
     }
 
     @Override
-    public ValueType getType() {
-        return ValueType.POTION;
-    }
-
-    @Override
     public void write(Writer writer) throws IOException {
         writer.write("potion{ ");
         Value.writeString(writer, name);
@@ -52,7 +47,7 @@ public class PotionValue implements Value {
     public void writeJson(JsonWriter writer) throws IOException {
         writer.beginObject();
         writer.name("type");
-        writer.value(getType().getName());
+        writer.value(ValueType.POTION.getName());
         writer.name("potion");
         writer.value(name);
         writer.name("amplifier");

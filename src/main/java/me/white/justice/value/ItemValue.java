@@ -6,7 +6,7 @@ import net.querz.nbt.tag.*;
 
 import java.io.IOException;
 import java.io.Writer;
-import java.nio.LongBuffer;
+import java.lang.reflect.Array;
 import java.util.Base64;
 import java.util.Map;
 
@@ -21,42 +21,29 @@ public class ItemValue implements Value {
         return tag;
     }
 
+    // since net.querz.nbt does not provide adequate customization
     private static void writeTag(Writer writer, Tag<?> tag) throws IOException {
         switch (tag) {
             case ArrayTag<?> array -> {
-                LongBuffer buffer = LongBuffer.allocate(array.length());
-                String prefix;
-                String suffix;
-                if (array instanceof ByteArrayTag byteArray) {
+                String prefix = "";
+                String suffix = "";
+                if (array instanceof ByteArrayTag) {
                     prefix = "B";
                     suffix = "B";
-                    for (byte value : byteArray.getValue()) {
-                        buffer.put(value);
-                    }
-                } else if (array instanceof IntArrayTag intArray) {
+                } else if (array instanceof IntArrayTag) {
                     prefix = "I";
-                    suffix = "";
-                    for (int value : intArray.getValue()) {
-                        buffer.put(value);
-                    }
-                } else if (array instanceof LongArrayTag longArray) {
+                } else if (array instanceof LongArrayTag) {
                     prefix = "L";
                     suffix = "L";
-                    buffer.put(((LongArrayTag)array).getValue());
-                } else {
-                    throw new AssertionError("unreachable");
                 }
-                buffer.flip();
                 writer.write("[");
                 writer.write(prefix);
                 writer.write(";");
-                if (buffer.limit() != 0) {
-                    writer.write(" ");
-                }
-                for (int i = 0; i < buffer.limit(); ++i) {
-                    writer.write(Long.toString(buffer.get()));
+                writer.write(" ");
+                for (int i = 0; i < array.length(); ++i) {
+                    writer.write(Array.get(array.getValue(), i).toString());
                     writer.write(suffix);
-                    if (i != buffer.limit() - 1) {
+                    if (i != array.length() - 1) {
                         writer.write(", ");
                     }
                 }
@@ -93,11 +80,6 @@ public class ItemValue implements Value {
     }
 
     @Override
-    public ValueType getType() {
-        return ValueType.ITEM;
-    }
-
-    @Override
     public void write(Writer writer) throws IOException {
         writer.write("item");
         writeTag(writer, tag);
@@ -107,7 +89,7 @@ public class ItemValue implements Value {
     public void writeJson(JsonWriter writer) throws IOException {
         writer.beginObject();
         writer.name("type");
-        writer.value(getType().getName());
+        writer.value(ValueType.ITEM.getName());
         byte[] bytes = new NBTSerializer(true).toBytes(new NamedTag(null, tag));
         String serialized = Base64.getEncoder().encodeToString(bytes);
         writer.name("item");

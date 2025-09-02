@@ -23,11 +23,6 @@ public class TextValue implements Value {
     }
 
     @Override
-    public ValueType getType() {
-        return ValueType.TEXT;
-    }
-
-    @Override
     public void write(Writer writer) throws IOException {
         if (textParsing != TextParsing.PLAIN) {
             writer.write(textParsing.getPrefix());
@@ -39,7 +34,7 @@ public class TextValue implements Value {
     public void writeJson(JsonWriter writer) throws IOException {
         writer.beginObject();
         writer.name("type");
-        writer.value(getType().getName());
+        writer.value(ValueType.TEXT.getName());
         writer.name("text");
         writer.value(text);
         writer.name("parsing");

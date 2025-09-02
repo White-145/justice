@@ -1,12 +1,15 @@
 package me.white.justice.value;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
-import me.white.justice.CompilationException;
+import me.white.justice.Marshal;
+import me.white.justice.MarshalException;
+import me.white.justice.ParsingException;
 import me.white.justice.lexer.Lexer;
 import me.white.justice.lexer.TokenType;
 import net.querz.nbt.io.NBTDeserializer;
-import net.querz.nbt.io.ParseException;
 import net.querz.nbt.io.SNBTParser;
 import net.querz.nbt.tag.CompoundTag;
 import net.querz.nbt.tag.Tag;
@@ -19,7 +22,7 @@ import java.util.Set;
 public enum ValueType {
     NUMBER("number", false) {
         @Override
-        public Value readJson(JsonObject object) {
+        public Value marshal(JsonObject object) {
             JsonPrimitive primitive = object.get("number").getAsJsonPrimitive();
             if (primitive.isString()) {
                 return new NumberValue(primitive.getAsString());
@@ -29,30 +32,43 @@ public enum ValueType {
     },
     TEXT("text", false) {
         @Override
-        public Value readJson(JsonObject object) {
+        public Value marshal(JsonObject object) throws MarshalException {
             String text = object.get("text").getAsString();
             TextParsing parsing = TextParsing.byName(object.get("parsing").getAsString());
             if (parsing == null) {
-                throw null; // invalid text parsing
+                throw new MarshalException("Invalid text parsing");
             }
             return new TextValue(parsing, text);
         }
     },
-    ARRAY("array", false),
+    ARRAY("array", false) {
+        @Override
+        public Value marshal(JsonObject object) throws MarshalException {
+            ArrayValue array = new ArrayValue();
+            JsonArray values = Marshal.jsonGet(object, "values").getAsJsonArray();
+            for (JsonElement element : values) {
+                Value innerValue = Marshal.marshalValue(element.getAsJsonObject(), false);
+                if (innerValue != null) {
+                    array.add(innerValue);
+                }
+            }
+            return array;
+        }
+    },
     VARIABLE("variable", false) {
         @Override
-        public Value readJson(JsonObject object) {
-            String name = object.get("variable").getAsString();
+        public Value marshal(JsonObject object) throws MarshalException {
+            String name = Marshal.jsonGet(object, "variable").getAsString();
             VariableScope scope = VariableScope.byName(object.get("scope").getAsString());
             if (scope == null) {
-                throw null; // invalid variable scope
+                throw new MarshalException("Invalid variable scope");
             }
             return new VariableValue(scope, name);
         }
     },
     GAME("game_value", false) {
         @Override
-        public Value readJson(JsonObject object) {
+        public Value marshal(JsonObject object) {
             String name = object.get("game_value").getAsString();
             String selector = object.get("selection").getAsString();
             if (selector.equals("null")) {
@@ -64,7 +80,7 @@ public enum ValueType {
     },
     LOCATION("location", true) {
         @Override
-        public Value read(Lexer lexer) throws CompilationException {
+        public Value parse(Lexer lexer) throws ParsingException {
             lexer.expect(TokenType.BLOCK_OPEN);
             double x = (double)lexer.expect(TokenType.NUMBER).getValue();
             lexer.expect(TokenType.COMMA);
@@ -84,7 +100,7 @@ public enum ValueType {
         }
 
         @Override
-        public Value readJson(JsonObject object) {
+        public Value marshal(JsonObject object) {
             double x = object.get("x").getAsDouble();
             double y = object.get("y").getAsDouble();
             double z = object.get("z").getAsDouble();
@@ -95,7 +111,7 @@ public enum ValueType {
     },
     VECTOR("vector", true) {
         @Override
-        public Value read(Lexer lexer) throws CompilationException {
+        public Value parse(Lexer lexer) throws ParsingException {
             lexer.expect(TokenType.BLOCK_OPEN);
             double x = (double)lexer.expect(TokenType.NUMBER).getValue();
             lexer.expect(TokenType.COMMA);
@@ -107,7 +123,7 @@ public enum ValueType {
         }
 
         @Override
-        public Value readJson(JsonObject object) {
+        public Value marshal(JsonObject object) {
             double x = object.get("x").getAsDouble();
             double y = object.get("y").getAsDouble();
             double z = object.get("z").getAsDouble();
@@ -116,40 +132,40 @@ public enum ValueType {
     },
     ITEM("item", true) {
         @Override
-        public Value read(Lexer lexer) throws CompilationException {
+        public Value parse(Lexer lexer) throws ParsingException {
             Tag<?> tag;
             SNBTParser parser = new SNBTParser(lexer.getBuffer().substring(lexer.getReadPos()));
             try {
                 tag = parser.parse(Tag.DEFAULT_MAX_DEPTH, true);
-            } catch (ParseException e) {
-                throw new CompilationException("Invalid item data: " + e.getMessage());
+            } catch (net.querz.nbt.io.ParseException e) {
+                throw new ParsingException("Invalid item data: " + e.getMessage());
             }
             if (!(tag instanceof CompoundTag)) {
-                throw new CompilationException("Invalid item data");
+                throw new ParsingException("Invalid item data");
             }
             lexer.advance(parser.getReadChars() - 1);
             return new ItemValue((CompoundTag)tag);
         }
 
         @Override
-        public Value readJson(JsonObject object) {
+        public Value marshal(JsonObject object) throws MarshalException {
             String serialized = object.get("item").getAsString();
             byte[] bytes = Base64.getDecoder().decode(serialized);
             Tag<?> item;
             try {
                 item = new NBTDeserializer().fromBytes(bytes).getTag();
             } catch (IOException e) {
-                throw null; // malformed item
+                throw new MarshalException("Incomplete item value");
             }
             if (!(item instanceof CompoundTag)) {
-                throw null; // malformed item
+                throw new MarshalException("Malformed item value");
             }
             return new ItemValue((CompoundTag)item);
         }
     },
     SOUND("sound", true) {
         @Override
-        public Value read(Lexer lexer) throws CompilationException {
+        public Value parse(Lexer lexer) throws ParsingException {
             lexer.expect(TokenType.BLOCK_OPEN);
             String name = (String)lexer.expect(TokenType.STRING).getValue();
             double volume = 1;
@@ -161,7 +177,7 @@ public enum ValueType {
                 lexer.expect(TokenType.COMMA);
                 String component = (String)lexer.expect(TokenType.LITERAL).getValue();
                 if (seenComponents.contains(component)) {
-                    throw new CompilationException("Duplicate sound component '" + component + "'");
+                    throw new ParsingException("Duplicate sound component '" + component + "'");
                 }
                 seenComponents.add(component);
                 lexer.expect(TokenType.EQUALS);
@@ -170,7 +186,7 @@ public enum ValueType {
                     case "pitch" -> pitch = (double)lexer.expect(TokenType.NUMBER).getValue();
                     case "source" -> source = (String)lexer.expect(TokenType.STRING).getValue();
                     case "variant" -> variant = (String)lexer.expect(TokenType.STRING).getValue();
-                    default -> throw new CompilationException("Invalid sound component '" + component + "'");
+                    default -> throw new ParsingException("Invalid sound component '" + component + "'");
                 }
             }
             lexer.expect(TokenType.BLOCK_CLOSE);
@@ -178,7 +194,7 @@ public enum ValueType {
         }
 
         @Override
-        public Value readJson(JsonObject object) {
+        public Value marshal(JsonObject object) {
             String name = object.get("sound").getAsString();
             double pitch = object.get("pitch").getAsDouble();
             double volume = object.get("volume").getAsDouble();
@@ -186,22 +202,22 @@ public enum ValueType {
             String source = null;
             if (object.has("variation")) {
                 variant = object.get("variation").getAsString();
+                if (variant.isEmpty()) {
+                    variant = null;
+                }
             }
             if (object.has("source")) {
-                object.get("source").getAsString();
-            }
-            if (variant != null && variant.isEmpty()) {
-                variant = null;
-            }
-            if (variant != null && source.equals("MASTER")) {
-                source = null;
+                source = object.get("source").getAsString();
+                if (source.equals("MASTER")) {
+                    source = null;
+                }
             }
             return new SoundValue(name, pitch, volume, variant, source);
         }
     },
     POTION("potion", true) {
         @Override
-        public Value read(Lexer lexer) throws CompilationException {
+        public Value parse(Lexer lexer) throws ParsingException {
             lexer.expect(TokenType.BLOCK_OPEN);
             String name = (String)lexer.expect(TokenType.STRING).getValue();
             int amplifier = 0;
@@ -211,14 +227,14 @@ public enum ValueType {
                 lexer.expect(TokenType.COMMA);
                 String component = (String)lexer.expect(TokenType.LITERAL).getValue();
                 if (seenComponents.contains(component)) {
-                    throw new CompilationException("Duplicate potion component '" + component + "'");
+                    throw new ParsingException("Duplicate potion component '" + component + "'");
                 }
                 seenComponents.add(component);
                 lexer.expect(TokenType.EQUALS);
                 switch (component) {
                     case "amplifier" -> amplifier = (int)lexer.expect(TokenType.NUMBER).getValue();
                     case "duration" -> duration = (int)lexer.expect(TokenType.NUMBER).getValue();
-                    default -> throw new CompilationException("Invalid potion component '" + component + "'");
+                    default -> throw new ParsingException("Invalid potion component '" + component + "'");
                 }
             }
             lexer.expect(TokenType.BLOCK_CLOSE);
@@ -226,7 +242,7 @@ public enum ValueType {
         }
 
         @Override
-        public Value readJson(JsonObject object) {
+        public Value marshal(JsonObject object) {
             String name = object.get("potion").getAsString();
             int amplifier = object.get("amplifier").getAsInt();
             int duration = object.get("duration").getAsInt();
@@ -235,7 +251,7 @@ public enum ValueType {
     },
     PARTICLE("particle", true) {
         @Override
-        public Value read(Lexer lexer) throws CompilationException {
+        public Value parse(Lexer lexer) throws ParsingException {
             lexer.expect(TokenType.BLOCK_OPEN);
             String name = (String)lexer.expect(TokenType.STRING).getValue();
             String material = null;
@@ -252,7 +268,7 @@ public enum ValueType {
                 lexer.expect(TokenType.COMMA);
                 String component = (String)lexer.expect(TokenType.LITERAL).getValue();
                 if (seenComponents.contains(component)) {
-                    throw new CompilationException("Duplicate particle component '" + component + "'");
+                    throw new ParsingException("Duplicate particle component '" + component + "'");
                 }
                 seenComponents.add(component);
                 lexer.expect(TokenType.EQUALS);
@@ -277,7 +293,7 @@ public enum ValueType {
                     case "count" -> count = (int)lexer.expect(TokenType.NUMBER).getValue();
                     case "color" -> color = (int)lexer.expect(TokenType.COLOR).getValue();
                     case "size" -> size = (double)lexer.expect(TokenType.NUMBER).getValue();
-                    default -> throw new CompilationException("Invalid particle component '" + component + "'");
+                    default -> throw new ParsingException("Invalid particle component '" + component + "'");
                 }
             }
             lexer.expect(TokenType.BLOCK_CLOSE);
@@ -285,7 +301,7 @@ public enum ValueType {
         }
 
         @Override
-        public Value readJson(JsonObject object) {
+        public Value marshal(JsonObject object) {
             String name = object.get("particle_type").getAsString();
             String material = null;
             double spreadH = 0;
@@ -322,7 +338,7 @@ public enum ValueType {
     },
     ENUM("enum", false) {
         @Override
-        public Value readJson(JsonObject object) {
+        public Value marshal(JsonObject object) {
             return new EnumValue(object.get("enum").getAsString());
         }
     };
@@ -352,11 +368,11 @@ public enum ValueType {
         return isFactory;
     }
 
-    public Value read(Lexer lexer) throws CompilationException {
+    public Value parse(Lexer lexer) throws ParsingException {
         throw new UnsupportedOperationException();
     }
 
-    public Value readJson(JsonObject object) {
+    public Value marshal(JsonObject object) throws MarshalException {
         throw new UnsupportedOperationException();
     }
 }

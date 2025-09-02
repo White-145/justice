@@ -23,11 +23,6 @@ public class VariableValue implements Value {
     }
 
     @Override
-    public ValueType getType() {
-        return ValueType.VARIABLE;
-    }
-
-    @Override
     public void write(Writer writer) throws IOException {
         boolean nonLocal = scope != VariableScope.LOCAL;
         if (nonLocal) {
@@ -40,7 +35,7 @@ public class VariableValue implements Value {
     public void writeJson(JsonWriter writer) throws IOException {
         writer.beginObject();
         writer.name("type");
-        writer.value(getType().getName());
+        writer.value(ValueType.VARIABLE.getName());
         writer.name("variable");
         writer.value(name);
         writer.name("scope");

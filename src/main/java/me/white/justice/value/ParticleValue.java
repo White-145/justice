@@ -83,11 +83,6 @@ public class ParticleValue implements Value {
     }
 
     @Override
-    public ValueType getType() {
-        return ValueType.PARTICLE;
-    }
-
-    @Override
     public void write(Writer writer) throws IOException {
         writer.write("particle{ ");
         Value.writeString(writer, name);
@@ -130,7 +125,7 @@ public class ParticleValue implements Value {
     public void writeJson(JsonWriter writer) throws IOException {
         writer.beginObject();
         writer.name("type");
-        writer.value(getType().getName());
+        writer.value(ValueType.NUMBER.getName());
         writer.name("particle_type");
         writer.value(name);
         if (hasMaterial()) {

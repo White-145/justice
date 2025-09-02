@@ -1,17 +1,13 @@
 package me.white.justice.value;
 
 import com.google.gson.stream.JsonWriter;
+import net.querz.nbt.io.ParseException;
 
 import java.io.IOException;
 import java.io.Writer;
 import java.util.ArrayList;
 
 public class ArrayValue extends ArrayList<Value> implements Value {
-    @Override
-    public ValueType getType() {
-        return ValueType.ARRAY;
-    }
-
     @Override
     public void write(Writer writer) throws IOException {
         writer.write("{ ");
@@ -31,12 +27,12 @@ public class ArrayValue extends ArrayList<Value> implements Value {
     public void writeJson(JsonWriter writer) throws IOException {
         writer.beginObject();
         writer.name("type");
-        writer.value(getType().getName());
+        writer.value(ValueType.ARRAY.getName());
         writer.name("values");
         writer.beginArray();
         for (Value innerValue : this) {
-            if (innerValue.getType() == ValueType.ARRAY) {
-                throw null; // no nested arrays allowed;
+            if (innerValue instanceof ArrayValue) {
+                throw new ParseException("Recursing array values");
             }
             innerValue.writeJson(writer);
         }

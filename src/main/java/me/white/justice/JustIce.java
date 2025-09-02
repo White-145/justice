@@ -12,22 +12,46 @@ import java.nio.file.Path;
 
 public class JustIce {
     private static final Options COMMAND_LINE_OPTIONS = new Options();
-    private static final Option HELP_OPTION = new Option("h", "help", false, "Shows this screen");
-    private static final Option OUT_OPTION = new Option("o", true, "Specifies the output file");
-    private static final Option COMPILE_OPTION = new Option("c", "compile", false, "Compiles provided files");
-    private static final Option DECOMPILE_OPTION = new Option("d", "decompile", false, "Decompiles provided files");
-    private static final Option PACK_OPTION = new Option("p", "pack", false, "Packs module into a single line");
+    private static final Option HELP_OPTION = Option.builder()
+            .desc("Show this help screen")
+            .option("h")
+            .longOpt("help")
+            .get();
+    private static final Option OUT_OPTION = Option.builder()
+            .desc("Specify the output file")
+            .option("o")
+            .hasArg()
+            .type(File.class)
+            .get();
+    private static final Option PARSE_OPTION = Option.builder()
+            .desc("Parse provided files")
+            .option("p")
+            .longOpt("parse")
+            .get();
+    private static final Option MARSHAL_OPTION = Option.builder()
+            .desc("Marshal provided files")
+            .option("m")
+            .longOpt("marshal")
+            .get();
+    private static final Option COMPACT_OPTION = Option.builder()
+            .desc("Pack module into a single line")
+            .option("p")
+            .longOpt("pack")
+            .get();
     private final CommandLine commandLine;
 
     static {
         COMMAND_LINE_OPTIONS.addOption(HELP_OPTION);
-        OUT_OPTION.setType(File.class);
         COMMAND_LINE_OPTIONS.addOption(OUT_OPTION);
-        OptionGroup compilationOptions = new OptionGroup();
-        compilationOptions.addOption(COMPILE_OPTION);
-        compilationOptions.addOption(DECOMPILE_OPTION);
-        COMMAND_LINE_OPTIONS.addOptionGroup(compilationOptions);
-        COMMAND_LINE_OPTIONS.addOption(PACK_OPTION);
+        COMMAND_LINE_OPTIONS.addOptionGroup(new OptionGroup()
+                .addOption(PARSE_OPTION)
+                .addOption(MARSHAL_OPTION)
+        );
+        COMMAND_LINE_OPTIONS.addOption(COMPACT_OPTION);
+    }
+
+    private JustIce(CommandLine commandLine) {
+        this.commandLine = commandLine;
     }
 
     public static void main(String[] args) {
@@ -42,18 +66,14 @@ public class JustIce {
         }
     }
 
-    private JustIce(CommandLine commandLine) {
-        this.commandLine = commandLine;
-    }
-
-    private boolean isCompiling(Path[] paths) {
-        if (commandLine.hasOption(COMPILE_OPTION)) {
+    private boolean isForParsing(Path[] paths) {
+        if (commandLine.hasOption(PARSE_OPTION)) {
             return true;
         }
-        if (commandLine.hasOption(DECOMPILE_OPTION)) {
+        if (commandLine.hasOption(MARSHAL_OPTION)) {
             return false;
         }
-        boolean isDecompiling = commandLine.hasOption(DECOMPILE_OPTION);
+        boolean isDecompiling = commandLine.hasOption(MARSHAL_OPTION);
         for (Path path : paths) {
             String filename = path.getFileName().toString();
             int dot = filename.lastIndexOf('.');
@@ -64,7 +84,7 @@ public class JustIce {
         return true;
     }
 
-    private void start() throws ParseException {
+    private void start() throws org.apache.commons.cli.ParseException {
         if (commandLine.hasOption(HELP_OPTION)) {
             help();
             return;
@@ -88,10 +108,10 @@ public class JustIce {
         if (commandLine.hasOption(OUT_OPTION)) {
             out = commandLine.getParsedOptionValue(OUT_OPTION);
         }
-        if (isCompiling(paths)) {
-            compile(paths, out);
+        if (isForParsing(paths)) {
+            parse(paths, out);
         } else {
-            decompile(paths, out);
+            marshal(paths, out);
         }
     }
 
@@ -104,52 +124,53 @@ public class JustIce {
         }
     }
 
-    private void compile(Path[] paths, File out) {
+    private void parse(Path[] paths, File out) {
         if (out == null) {
             out = new File("result.json");
         }
-        Compiler compiler = new Compiler();
-        compiler.setCompact(commandLine.hasOption(PACK_OPTION));
+        Parser parser = new Parser();
+        parser.setCompact(commandLine.hasOption(COMPACT_OPTION));
         for (Path path : paths) {
             try {
                 String source = Files.readString(path);
-                compiler.compile(source);
+                parser.parse(source);
             } catch (IOException e) {
                 System.err.print("Could not read file '" + path + "': ");
                 e.printStackTrace();
                 return;
-            } catch (CompilationException e) {
+            } catch (ParsingException e) {
                 System.out.println("Compile error: " + e.getMessage());
                 e.printStackTrace();
                 return;
             }
         }
         try (FileWriter file = new FileWriter(out)) {
-            compiler.write(file);
+            parser.write(file);
         } catch (IOException e) {
             System.err.print("Could not write file '" + out + "': ");
             e.printStackTrace();
         }
     }
 
-    private void decompile(Path[] paths, File out) {
+    private void marshal(Path[] paths, File out) {
         if (out == null) {
             out = new File("result.ice");
         }
-        Decompiler decompiler = new Decompiler();
+        Marshal marshal = new Marshal();
         for (Path path : paths) {
-            String source;
             try {
-                source = Files.readString(path);
+                String source = Files.readString(path);
+                marshal.marshal(source);
             } catch (IOException e) {
                 System.err.print("Could not read file '" + path + "': ");
                 e.printStackTrace();
                 return;
+            } catch (MarshalException e) {
+                System.out.println("Marshal error: " + e.getMessage());
             }
-            decompiler.decompile(source);
         }
         try (FileWriter writer = new FileWriter(out)) {
-            decompiler.write(writer);
+            marshal.write(writer);
         } catch (IOException e) {
             System.err.print("Could not write file '" + out + "': ");
             e.printStackTrace();

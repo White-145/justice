@@ -1,6 +1,6 @@
 package me.white.justice.lexer;
 
-import me.white.justice.CompilationException;
+import me.white.justice.ParsingException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -116,7 +116,7 @@ public class Lexer {
         advanceFrom(start);
     }
 
-    private String readEnclosed(char close, String name) throws CompilationException {
+    private String readEnclosed(char close, String name) throws ParsingException {
         int start = pos;
         pos += 1;
         StringBuilder builder = new StringBuilder();
@@ -128,7 +128,7 @@ public class Lexer {
             if (ch == '\\') {
                 pos += 1;
                 if (!canRead()) {
-                    throw new CompilationException("Incomplete escape sequence");
+                    throw new ParsingException("Incomplete escape sequence");
                 }
                 ch = buffer.charAt(pos);
                 if (ch == '\n') {
@@ -136,14 +136,14 @@ public class Lexer {
                     continue;
                 }
                 if (ch != close && ch != '\\') {
-                    throw new CompilationException("Invalid escape sequence");
+                    throw new ParsingException("Invalid escape sequence");
                 }
             }
             builder.append(ch);
             pos += 1;
         }
         if (!canRead() || buffer.charAt(pos) != close) {
-            throw new CompilationException("Incomplete " + name);
+            throw new ParsingException("Incomplete " + name);
         }
         pos += 1;
         advanceFrom(start);
@@ -160,7 +160,7 @@ public class Lexer {
         return literal;
     }
 
-    private double readNumber() throws CompilationException {
+    private double readNumber() throws ParsingException {
         int start = pos;
         char ch = buffer.charAt(pos);
         if (ch == '-' || ch == '+') {
@@ -182,7 +182,7 @@ public class Lexer {
                 hasE = true;
                 pos += 1;
                 if (!canRead()) {
-                    throw new CompilationException("Incomplete number");
+                    throw new ParsingException("Incomplete number");
                 }
                 ch = buffer.charAt(pos);
                 if (ch != '-' && ch != '+' && (ch < '0' || ch > '9')) {
@@ -200,11 +200,11 @@ public class Lexer {
             advance(advance);
             return number;
         } catch (NumberFormatException e) {
-            throw new CompilationException("Invalid number: " + e.getMessage());
+            throw new ParsingException("Invalid number: " + e.getMessage());
         }
     }
 
-    private String readPlaceholder() throws CompilationException {
+    private String readPlaceholder() throws ParsingException {
         int start = pos;
         int depth = 0;
         pos += 1;
@@ -216,7 +216,7 @@ public class Lexer {
             if (ch == ')') {
                 depth -= 1;
                 if (depth < 0) {
-                    throw new CompilationException("Malformed placeholder");
+                    throw new ParsingException("Malformed placeholder");
                 }
             }
             if ((ch == ')' || ch == '%') && depth == 0) {
@@ -225,7 +225,7 @@ public class Lexer {
             pos += 1;
         }
         if (!canRead()) {
-            throw new CompilationException("Incomplete placeholder");
+            throw new ParsingException("Incomplete placeholder");
         }
         pos += 1;
         String placeholder = buffer.substring(start, pos);
@@ -233,13 +233,13 @@ public class Lexer {
         return placeholder;
     }
 
-    private int readColor() throws CompilationException {
+    private int readColor() throws ParsingException {
         int start = pos;
         int color = 0;
         pos += 1;
         for (int i = 0; i < 6; ++i) {
             if (!canRead()) {
-                throw new CompilationException("Incomplete color");
+                throw new ParsingException("Incomplete color");
             }
             char ch = buffer.charAt(pos);
             color <<= 4;
@@ -250,7 +250,7 @@ public class Lexer {
             } else if (ch >= 'A' && ch <= 'F') {
                 color += ch - 'A' + 10;
             } else {
-                throw new CompilationException("Invalid color component");
+                throw new ParsingException("Invalid color component");
             }
             pos += 1;
         }
@@ -258,48 +258,49 @@ public class Lexer {
         return color;
     }
 
-    private Token next() throws CompilationException {
+    private Token next() throws ParsingException {
         skipWhitespace();
         if (!canRead()) {
             if (eof == null) {
                 eof = new Token(TokenType.EOF, null, pos, row, column);
             }
+            System.out.println("eof");
             return eof;
         }
         int pos = this.pos;
         int row = this.row;
         int column = this.column;
         char ch = buffer.charAt(pos);
+        Token token;
         if (SIMPLE_TOKENS.containsKey(ch)) {
             advance(1);
-            return new Token(SIMPLE_TOKENS.get(ch), null, pos, row, column);
+            token = new Token(SIMPLE_TOKENS.get(ch), null, pos, row, column);
+        } else if (isNumberStart(ch)) {
+            token = new Token(TokenType.NUMBER, readNumber(), pos, row, column);
+        } else if (isLiteralStart(ch)) {
+            token = new Token(TokenType.LITERAL, readLiteral(), pos, row, column);
+        } else {
+            token = switch (ch) {
+                case '"' -> new Token(TokenType.STRING, readEnclosed('"', "string"), pos, row, column);
+                case '`' -> new Token(TokenType.IDENTIFIER, readEnclosed('`', "identifier"), pos, row, column);
+                case '\'' -> new Token(TokenType.ENUM, readEnclosed('\'', "enum"), pos, row, column);
+                case '%' -> new Token(TokenType.PLACEHOLDER, readPlaceholder(), pos, row, column);
+                case '#' -> new Token(TokenType.COLOR, readColor(), pos, row, column);
+                default -> throw new ParsingException("Invalid token");
+            };
         }
-        if (isNumberStart(ch)) {
-            return new Token(TokenType.NUMBER, readNumber(), pos, row, column);
-        }
-        if (isLiteralStart(ch)) {
-            return new Token(TokenType.LITERAL, readLiteral(), pos, row, column);
-        }
-        Token token = switch (ch) {
-            case '"' -> new Token(TokenType.STRING, readEnclosed('"', "string"), pos, row, column);
-            case '`' -> new Token(TokenType.IDENTIFIER, readEnclosed('`', "identifier"), pos, row, column);
-            case '\'' -> new Token(TokenType.ENUM, readEnclosed('\'', "enum"), pos, row, column);
-            case '%' -> new Token(TokenType.PLACEHOLDER, readPlaceholder(), pos, row, column);
-            case '#' -> new Token(TokenType.COLOR, readColor(), pos, row, column);
-            default -> throw new CompilationException("Invalid token");
-        };
         skipWhitespace();
         return token;
     }
 
-    public Token peek() throws CompilationException {
+    public Token peek() throws ParsingException {
         if (pending == null) {
             pending = next();
         }
         return pending;
     }
 
-    public Token read() throws CompilationException {
+    public Token read() throws ParsingException {
         if (pending == null) {
             return next();
         }
@@ -308,18 +309,18 @@ public class Lexer {
         return token;
     }
 
-    public Token expect(TokenType type) throws CompilationException {
-        Token token = peek();
+    public Token expect(TokenType type) throws ParsingException {
+        Token token = read();
         if (!token.isOf(type)) {
-            throw new CompilationException("Expected " + type + ", got " + token.getType());
+            throw new ParsingException("Expected " + type + ", got " + token.getType());
         }
         return token;
     }
 
-    public Token expectIdentifier() throws CompilationException {
-        Token token = peek();
+    public Token expectIdentifier() throws ParsingException {
+        Token token = read();
         if (!token.getType().isIdentifier()) {
-            throw new CompilationException("Expected identifier-like, got " + token.getType());
+            throw new ParsingException("Expected identifier-like, got " + token.getType());
         }
         return token;
     }

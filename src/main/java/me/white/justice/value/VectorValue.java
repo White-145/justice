@@ -29,11 +29,6 @@ public class VectorValue implements Value {
     }
 
     @Override
-    public ValueType getType() {
-        return ValueType.VECTOR;
-    }
-
-    @Override
     public void write(Writer writer) throws IOException {
         writer.write("vector{ ");
         Value.writeNumber(writer, x);
@@ -48,7 +43,7 @@ public class VectorValue implements Value {
     public void writeJson(JsonWriter writer) throws IOException {
         writer.beginObject();
         writer.name("type");
-        writer.value(getType().getName());
+        writer.value(ValueType.VECTOR.getName());
         writer.name("x");
         writer.value(x);
         writer.name("y");

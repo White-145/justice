@@ -27,11 +27,6 @@ public class GameValue implements Value {
     }
 
     @Override
-    public ValueType getType() {
-        return ValueType.GAME;
-    }
-
-    @Override
     public void write(Writer writer) throws IOException {
         writer.write("<");
         if (hasSelector()) {
@@ -45,7 +40,7 @@ public class GameValue implements Value {
     public void writeJson(JsonWriter writer) throws IOException {
         writer.beginObject();
         writer.name("type");
-        writer.value(getType().getName());
+        writer.value(ValueType.GAME.getName());
         writer.name("game_value");
         writer.value(name);
         writer.name("selection");

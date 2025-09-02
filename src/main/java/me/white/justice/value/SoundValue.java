@@ -49,11 +49,6 @@ public class SoundValue implements Value {
     }
 
     @Override
-    public ValueType getType() {
-        return ValueType.SOUND;
-    }
-
-    @Override
     public void write(Writer writer) throws IOException {
         writer.write("sound{ ");
         Value.writeString(writer, name);
@@ -82,7 +77,7 @@ public class SoundValue implements Value {
     public void writeJson(JsonWriter writer) throws IOException {
         writer.beginObject();
         writer.name("type");
-        writer.value(getType().getName());
+        writer.value(ValueType.SOUND.getName());
         writer.name("sound");
         writer.value(name);
         writer.name("pitch");

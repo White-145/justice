@@ -1,112 +1,111 @@
 package me.white.justice;
 
 import com.google.gson.*;
-import me.white.justice.parser.Handler;
-import me.white.justice.parser.HandlerType;
-import me.white.justice.parser.Operation;
 import me.white.justice.value.*;
 
 import java.io.IOException;
 import java.io.Writer;
 import java.util.*;
 
-public class Decompiler {
+public class Marshal {
     private final List<Handler> handlers = new ArrayList<>();
 
-    public Decompiler() { }
+    public Marshal() { }
 
-    public void decompile(String json) {
-        JsonObject object = JsonParser.parseString(json).getAsJsonObject();
-        JsonArray handlersArray = object.get("handlers").getAsJsonArray();
-        for (JsonElement element : handlersArray) {
-            decompileHandler(element.getAsJsonObject());
+    public static JsonElement jsonGet(JsonObject object, String name) throws MarshalException {
+        JsonElement element = object.get(name);
+        if (element == null) {
+            throw new MarshalException("No '" + name + "' member");
+        }
+        return element;
+    }
+
+    public void marshal(String json) throws MarshalException {
+        try {
+            JsonObject object = JsonParser.parseString(json).getAsJsonObject();
+            JsonArray handlersArray = jsonGet(object, "handlers").getAsJsonArray();
+            for (JsonElement element : handlersArray) {
+                handlers.add(marshalHandler(element.getAsJsonObject()));
+            }
+        } catch (JsonParseException | IllegalStateException | MarshalException e) {
+            throw new MarshalException("Malformed module: " + e.getMessage());
         }
     }
 
-    private void decompileHandler(JsonObject handler) {
-        HandlerType type = HandlerType.byName(handler.get("type").getAsString());
+    public static Handler marshalHandler(JsonObject handler) throws MarshalException {
+        String typeString = jsonGet(handler, "type").getAsString();
+        HandlerType type = HandlerType.byName(typeString);
         if (type == null) {
-            throw null; // invalid handler type
+            throw new MarshalException("Invalid handler type '" + typeString + "'");
         }
         String name;
         if (type == HandlerType.EVENT) {
-            name = handler.get("event").getAsString();
+            name = jsonGet(handler, "event").getAsString();
         } else {
-            name = handler.get("name").getAsString();
+            name = jsonGet(handler, "name").getAsString();
         }
         List<Operation> operations = new ArrayList<>();
-        JsonArray operationsArray = handler.get("operations").getAsJsonArray();
+        JsonArray operationsArray = jsonGet(handler, "operations").getAsJsonArray();
         for (JsonElement element : operationsArray) {
             JsonObject operation = element.getAsJsonObject();
-            operations.add(decompileOperation(operation));
+            operations.add(marshalOperation(operation));
         }
-        handlers.add(new Handler(type, name, operations));
+        return new Handler(type, name, operations);
     }
 
-    private static Operation decompileOperation(JsonObject operation) {
-        String name = operation.get("action").getAsString();
+    public static Operation marshalOperation(JsonObject operation) throws MarshalException {
+        String name = jsonGet(operation, "action").getAsString();
         String delegate = null;
         boolean isInverted = false;
         String selector = null;
         Map<String, Value> arguments = new HashMap<>();
         List<Operation> operations = new ArrayList<>();
         if (operation.has("conditional")) {
-            JsonObject conditional = operation.get("conditional").getAsJsonObject();
-            delegate = conditional.get("action").getAsString();
+            JsonObject conditional = jsonGet(operation, "conditional").getAsJsonObject();
+            delegate = jsonGet(conditional, "action").getAsString();
             if (conditional.has("is_inverted")) {
-                isInverted = conditional.get("is_inverted").getAsBoolean();
+                isInverted = jsonGet(conditional, "is_inverted").getAsBoolean();
             }
         } else if (operation.has("is_inverted")) {
-            isInverted = operation.get("is_inverted").getAsBoolean();
+            isInverted = jsonGet(operation, "is_inverted").getAsBoolean();
         }
         if (operation.has("selection")) {
-            JsonObject selection = operation.get("selection").getAsJsonObject();
-            selector = selection.get("type").getAsString();
+            JsonObject selection = jsonGet(operation, "selection").getAsJsonObject();
+            selector = jsonGet(selection, "type").getAsString();
         }
-        JsonArray values = operation.get("values").getAsJsonArray();
+        JsonArray values = jsonGet(operation, "values").getAsJsonArray();
         for (JsonElement element : values) {
             JsonObject argument = element.getAsJsonObject();
-            String valueName = argument.get("name").getAsString();
-            JsonObject valueObject = argument.get("value").getAsJsonObject();
-            Value value = decompileValue(valueObject, true);
+            String valueName = jsonGet(argument, "name").getAsString();
+            JsonObject valueObject = jsonGet(argument, "value").getAsJsonObject();
+            Value value = marshalValue(valueObject, true);
             if (value != null) {
                 arguments.put(valueName, value);
             }
         }
         if (operation.has("operations")) {
-            JsonArray operationsArray = operation.get("operations").getAsJsonArray();
+            JsonArray operationsArray = jsonGet(operation, "operations").getAsJsonArray();
             for (JsonElement element : operationsArray) {
                 JsonObject operationObject = element.getAsJsonObject();
-                operations.add(decompileOperation(operationObject));
+                operations.add(marshalOperation(operationObject));
             }
         }
         return new Operation(isInverted, name, selector, arguments, operations, delegate);
     }
 
-    private static Value decompileValue(JsonObject value, boolean allowArrays) {
+    public static Value marshalValue(JsonObject value, boolean allowArrays) throws MarshalException {
         if (value.isEmpty()) {
             return null;
         }
-        ValueType type = ValueType.byName(value.get("type").getAsString());
+        String typeString = jsonGet(value, "type").getAsString();
+        ValueType type = ValueType.byName(typeString);
         if (type == null) {
-            throw null; // invalid type
+            throw new MarshalException("Invalid value type '" + typeString + "'");
         }
-        if (type == ValueType.ARRAY) {
-            if (!allowArrays) {
-                throw null; // no recursing arrays
-            }
-            ArrayValue array = new ArrayValue();
-            JsonArray values = value.get("values").getAsJsonArray();
-            for (JsonElement element : values) {
-                JsonObject object = element.getAsJsonObject();
-                Value innerValue = decompileValue(object, false);
-                if (innerValue != null) {
-                    array.add(innerValue);
-                }
-            }
-            return array;
+        if (type == ValueType.ARRAY && !allowArrays) {
+            throw new MarshalException("Recursing array values");
         }
-        return type.readJson(value);
+        return type.marshal(value);
     }
 
     public void write(Writer writer) throws IOException {
