@@ -1,9 +1,12 @@
 package me.white.justice.value;
 
+import com.google.gson.stream.JsonWriter;
 import me.white.justice.CompilationException;
 import me.white.justice.lexer.Lexer;
 import me.white.justice.lexer.TokenType;
 
+import java.io.IOException;
+import java.io.Writer;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -136,5 +139,74 @@ public class ParticleValue implements Value {
     @Override
     public ValueType getType() {
         return ValueType.PARTICLE;
+    }
+
+    @Override
+    public void write(Writer writer) throws IOException {
+        writer.write("particle{ ");
+        Value.writeString(writer, name);
+        if (hasMaterial()) {
+            writer.write(", material=\"");
+            writer.write(material);
+            writer.write("\"");
+        }
+        if (hasSpread()) {
+            writer.write(", spread={ ");
+            Value.writeNumber(writer, spreadH);
+            writer.write(", ");
+            Value.writeNumber(writer, spreadV);
+            writer.write(" }");
+        }
+        if (hasMotion()) {
+            writer.write(", motion={ ");
+            Value.writeNumber(writer, motionX);
+            writer.write(", ");
+            Value.writeNumber(writer, motionY);
+            writer.write(", ");
+            Value.writeNumber(writer, motionZ);
+            writer.write(" }");
+        }
+        if (count != 1) {
+            writer.write(", count=");
+            writer.write(Integer.toString(count));
+        }
+        if (color != 0xFF0000) {
+            writer.write(String.format(", color=#%06X", color));
+        }
+        if (size != 1) {
+            writer.write(", size=");
+            Value.writeNumber(writer, size);
+        }
+        writer.write(" }");
+    }
+
+    @Override
+    public void writeJson(JsonWriter writer) throws IOException {
+        writer.beginObject();
+        writer.name("type");
+        writer.value(getType().getName());
+        writer.name("particle_type");
+        writer.value(name);
+        if (hasMaterial()) {
+            writer.name("material");
+            writer.value(material);
+        }
+        writer.name("count");
+        writer.value(count);
+        writer.name("first_spread");
+        writer.value(spreadH);
+        writer.name("second_spread");
+        writer.value(spreadV);
+        writer.name("x_motion");
+        writer.value(motionX);
+        writer.name("y_motion");
+        writer.value(motionY);
+        writer.name("z_motion");
+        writer.value(motionZ);
+        writer.name("color");
+        writer.value(color);
+        writer.name("size");
+        writer.value(size);
+        writer.endObject();
     }
 }

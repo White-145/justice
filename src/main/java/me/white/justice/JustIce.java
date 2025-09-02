@@ -1,6 +1,5 @@
 package me.white.justice;
 
-import me.white.justice.parser.Handler;
 import org.apache.commons.cli.*;
 import org.apache.commons.cli.help.HelpFormatter;
 
@@ -10,15 +9,14 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
 
 public class JustIce {
     private static final Options COMMAND_LINE_OPTIONS = new Options();
     private static final Option HELP_OPTION = new Option("h", "help", false, "Shows this screen");
     private static final Option OUT_OPTION = new Option("o", true, "Specifies the output file");
     private static final Option COMPILE_OPTION = new Option("c", "compile", false, "Compiles provided files");
-    private static final Option DECOMPILE_OPTION = new Option("d", "decompile", false, "Deompiles provided files");
+    private static final Option DECOMPILE_OPTION = new Option("d", "decompile", false, "Decompiles provided files");
+    private static final Option PACK_OPTION = new Option("p", "pack", false, "Packs module into a single line");
     private final CommandLine commandLine;
 
     static {
@@ -29,6 +27,7 @@ public class JustIce {
         compilationOptions.addOption(COMPILE_OPTION);
         compilationOptions.addOption(DECOMPILE_OPTION);
         COMMAND_LINE_OPTIONS.addOptionGroup(compilationOptions);
+        COMMAND_LINE_OPTIONS.addOption(PACK_OPTION);
     }
 
     public static void main(String[] args) {
@@ -109,11 +108,12 @@ public class JustIce {
         if (out == null) {
             out = new File("result.json");
         }
-        List<Handler> handlers = new ArrayList<>();
+        Compiler compiler = new Compiler();
+        compiler.setCompact(commandLine.hasOption(PACK_OPTION));
         for (Path path : paths) {
             try {
                 String source = Files.readString(path);
-                handlers.addAll(Compiler.parse(source));
+                compiler.compile(source);
             } catch (IOException e) {
                 System.err.print("Could not read file '" + path + "': ");
                 e.printStackTrace();
@@ -125,7 +125,7 @@ public class JustIce {
             }
         }
         try (FileWriter file = new FileWriter(out)) {
-            Compiler.write(file, handlers);
+            compiler.write(file);
         } catch (IOException e) {
             System.err.print("Could not write file '" + out + "': ");
             e.printStackTrace();
@@ -136,7 +136,7 @@ public class JustIce {
         if (out == null) {
             out = new File("result.ice");
         }
-        List<Handler> handlers = new ArrayList<>();
+        Decompiler decompiler = new Decompiler();
         for (Path path : paths) {
             String source;
             try {
@@ -146,10 +146,10 @@ public class JustIce {
                 e.printStackTrace();
                 return;
             }
-            handlers.addAll(Decompiler.read(source));
+            decompiler.decompile(source);
         }
         try (FileWriter writer = new FileWriter(out)) {
-            Decompiler.write(writer, handlers);
+            decompiler.write(writer);
         } catch (IOException e) {
             System.err.print("Could not write file '" + out + "': ");
             e.printStackTrace();

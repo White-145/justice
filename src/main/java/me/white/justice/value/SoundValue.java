@@ -1,9 +1,12 @@
 package me.white.justice.value;
 
+import com.google.gson.stream.JsonWriter;
 import me.white.justice.CompilationException;
 import me.white.justice.lexer.Lexer;
 import me.white.justice.lexer.TokenType;
 
+import java.io.IOException;
+import java.io.Writer;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -81,5 +84,52 @@ public class SoundValue implements Value {
     @Override
     public ValueType getType() {
         return ValueType.SOUND;
+    }
+
+    @Override
+    public void write(Writer writer) throws IOException {
+        writer.write("sound{ ");
+        Value.writeString(writer, name);
+        if (volume != 1) {
+            writer.write(", volume=");
+            Value.writeNumber(writer, volume);
+        }
+        if (pitch != 1) {
+            writer.write(", pitch=");
+            Value.writeNumber(writer, pitch);
+        }
+        if (hasSource()) {
+            writer.write(", source=\"");
+            writer.write(source);
+            writer.write("\"");
+        }
+        if (hasVariant()) {
+            writer.write(", variant=\"");
+            writer.write(variant);
+            writer.write("\"");
+        }
+        writer.write(" }");
+    }
+
+    @Override
+    public void writeJson(JsonWriter writer) throws IOException {
+        writer.beginObject();
+        writer.name("type");
+        writer.value(getType().getName());
+        writer.name("sound");
+        writer.value(name);
+        writer.name("pitch");
+        writer.value(pitch);
+        writer.name("volume");
+        writer.value(volume);
+        if (hasVariant()) {
+            writer.name("variation");
+            writer.value(variant);
+        }
+        if (hasSource()) {
+            writer.name("source");
+            writer.value(source);
+        }
+        writer.endObject();
     }
 }

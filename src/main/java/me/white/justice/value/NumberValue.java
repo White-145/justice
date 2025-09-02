@@ -1,5 +1,10 @@
 package me.white.justice.value;
 
+import com.google.gson.stream.JsonWriter;
+
+import java.io.IOException;
+import java.io.Writer;
+
 public class NumberValue implements Value {
     private final String placeholder;
     private final double number;
@@ -14,11 +19,6 @@ public class NumberValue implements Value {
         this.number = number;
     }
 
-    @Override
-    public ValueType getType() {
-        return ValueType.NUMBER;
-    }
-
     public boolean isPlaceholder() {
         return placeholder != null;
     }
@@ -29,5 +29,33 @@ public class NumberValue implements Value {
 
     public double getNumber() {
         return number;
+    }
+
+    @Override
+    public ValueType getType() {
+        return ValueType.NUMBER;
+    }
+
+    @Override
+    public void write(Writer writer) throws IOException {
+        if (isPlaceholder()) {
+            writer.write(placeholder);
+        } else {
+            writer.write(Double.toString(number));
+        }
+    }
+
+    @Override
+    public void writeJson(JsonWriter writer) throws IOException {
+        writer.beginObject();
+        writer.name("type");
+        writer.value(getType().getName());
+        writer.name("number");
+        if (isPlaceholder()) {
+            writer.value(placeholder);
+        } else {
+            writer.value(number);
+        }
+        writer.endObject();
     }
 }
