@@ -27,7 +27,7 @@ launch4j {
     chdir = '%OLDPWD%'
     version = project.version
     textVersion = project.version as String
-    fileDescription = 'JustMC Code Assembler'
+    fileDescription = 'JustMC Code Parser'
     productName = 'JustIce'
     internalName = 'JustIce'
 }
