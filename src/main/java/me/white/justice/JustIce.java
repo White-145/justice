@@ -96,7 +96,7 @@ public class JustIce {
         }
         String[] files = commandLine.getArgs();
         if (files.length == 0) {
-            System.out.println("No files provided for processing");
+            System.out.println("No files provided for processing. -h for help");
             return;
         }
         Path[] paths = new Path[files.length];

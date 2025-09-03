@@ -25,6 +25,7 @@ launch4j {
     jarTask = shadowJar
     copyConfigurable = [ ]
     chdir = '%OLDPWD%'
+    outfile = project.name + '-' + project.version + '.exe'
     version = project.version
     textVersion = project.version as String
     fileDescription = 'JustMC Code Parser'
