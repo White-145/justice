@@ -39,7 +39,7 @@ public class Parser {
         HandlerType type = HandlerType.FUNCTION;
         Token name = lexer.expectIdentifier();
         if (!name.isOf(TokenType.IDENTIFIER) && lexer.peek().getType().isIdentifier()) {
-            HandlerType constitute = HandlerType.byName((String)name.getValue());
+            HandlerType constitute = HandlerType.byName(name.getString());
             if (constitute != null) {
                 type = constitute;
                 name = lexer.expectIdentifier();
@@ -50,7 +50,7 @@ public class Parser {
             operations.add(parseOperation(lexer));
         }
         lexer.expect(TokenType.BLOCK_CLOSE);
-        return new Handler(type, (String)name.getValue(), operations);
+        return new Handler(name.getString(), type, operations);
     }
 
     private static Operation parseOperation(Lexer lexer) throws ParsingException {
@@ -63,26 +63,26 @@ public class Parser {
         if (lexer.peek().getType().isIdentifier()) {
             delegate = lexer.expectIdentifier();
         }
-        if (name.isOf(TokenType.LITERAL) && name.getValue().equals("not")) {
+        if (name.isOf(TokenType.LITERAL) && name.getString().equals("not")) {
             isInverted = true;
             if (delegate == null) {
                 throw new ParsingException("Inversion without an action");
             }
             name = delegate;
             delegate = null;
-        } else if (delegate != null && delegate.isOf(TokenType.LITERAL) && delegate.getValue().equals("not")) {
+        } else if (delegate != null && delegate.isOf(TokenType.LITERAL) && delegate.getString().equals("not")) {
             isInverted = true;
             delegate = lexer.expectIdentifier();
         }
         if (lexer.peek().isOf(TokenType.SELECTOR_OPEN)) {
             lexer.read();
-            selector = (String)lexer.expect(TokenType.LITERAL).getValue();
+            selector = lexer.expect(TokenType.LITERAL).getString();
             lexer.expect(TokenType.SELECTOR_CLOSE);
         }
         if (lexer.peek().isOf(TokenType.ARGS_OPEN)) {
             lexer.read();
             while (lexer.hasNext() && !lexer.peek().isOf(TokenType.ARGS_CLOSE)) {
-                String argument = (String)lexer.expect(TokenType.LITERAL).getValue();
+                String argument = lexer.expect(TokenType.LITERAL).getString();
                 lexer.expect(TokenType.EQUALS);
                 Value value = parseValue(lexer, true);
                 arguments.put(argument, value);
@@ -101,14 +101,14 @@ public class Parser {
         } else {
             lexer.expect(TokenType.EOL);
         }
-        return new Operation(isInverted, (String)name.getValue(), selector, arguments, operations, delegate == null ? null : (String)delegate.getValue());
+        return new Operation(name.getString(), isInverted, delegate == null ? null : delegate.getString(), selector, arguments, operations);
     }
 
     private static Value parseValue(Lexer lexer, boolean allowLists) throws ParsingException {
         Token token = lexer.read();
         return switch (token.getType()) {
             case LITERAL -> {
-                String name = (String)token.getValue();
+                String name = token.getString();
                 if (name.length() == 1) {
                     char prefix = name.charAt(0);
                     Token next = lexer.peek();
@@ -118,7 +118,7 @@ public class Parser {
                         if (parsing == null) {
                             throw new ParsingException("Invalid text parsing '" + prefix + "'");
                         }
-                        yield new TextValue(parsing, (String)next.getValue());
+                        yield new TextValue(next.getString(), parsing);
                     }
                     if (next.isOf(TokenType.IDENTIFIER)) {
                         lexer.read();
@@ -126,20 +126,20 @@ public class Parser {
                         if (scope == null) {
                             throw new ParsingException("Invalid variable scope '" + prefix + "'");
                         }
-                        yield new VariableValue(scope, (String)next.getValue());
+                        yield new VariableValue(next.getString(), scope);
                     }
                 }
                 ValueType type = ValueType.byName(name);
                 if (type != null && type.isFactory() && lexer.peek().isOf(TokenType.BLOCK_OPEN)) {
                     yield type.parse(lexer);
                 }
-                yield new VariableValue(VariableScope.LOCAL, name);
+                yield new VariableValue(name, VariableScope.LOCAL);
             }
-            case IDENTIFIER -> new VariableValue(VariableScope.LOCAL, (String)token.getValue());
-            case STRING -> new TextValue(TextParsing.PLAIN, (String)token.getValue());
-            case NUMBER -> new NumberValue((double)token.getValue());
-            case PLACEHOLDER -> new NumberValue((String)token.getValue());
-            case ENUM -> new EnumValue((String)token.getValue());
+            case IDENTIFIER -> new VariableValue(token.getString(), VariableScope.LOCAL);
+            case STRING -> new TextValue(token.getString(), TextParsing.PLAIN);
+            case NUMBER -> new NumberValue(token.getNumber());
+            case PLACEHOLDER -> new NumberValue(token.getString());
+            case ENUM -> new EnumValue(token.getString());
             case BLOCK_OPEN -> {
                 if (!allowLists) {
                     throw new ParsingException("Cannot recurse list values");
@@ -157,11 +157,11 @@ public class Parser {
             case SELECTOR_OPEN -> {
                 String selector = null;
                 if (!lexer.peek().isOf(TokenType.SELECTOR_CLOSE)) {
-                    selector = (String)lexer.expect(TokenType.LITERAL).getValue();
+                    selector = lexer.expect(TokenType.LITERAL).getString();
                 }
                 lexer.expect(TokenType.SELECTOR_CLOSE);
-                String name = (String)lexer.expectIdentifier().getValue();
-                yield new GameValue(selector, name);
+                String name = lexer.expectIdentifier().getString();
+                yield new GameValue(name, selector);
             }
             default -> throw new ParsingException("Invalid value");
         };
@@ -187,11 +187,7 @@ public class Parser {
         writer.name("type");
         HandlerType type = handler.getType();
         writer.value(type.getName());
-        if (type == HandlerType.EVENT) {
-            writer.name("event");
-        } else {
-            writer.name("name");
-        }
+        writer.name(type.getNameField());
         writer.value(handler.getName());
         writer.name("operations");
         writer.beginArray();
@@ -227,15 +223,13 @@ public class Parser {
         }
         writer.name("values");
         writer.beginArray();
-        if (!operation.getArguments().isEmpty()) {
-            for (Map.Entry<String, Value> entry : operation.getArguments().entrySet()) {
-                writer.beginObject();
-                writer.name("name");
-                writer.value(entry.getKey());
-                writer.name("value");
-                entry.getValue().writeJson(writer);
-                writer.endObject();
-            }
+        for (Map.Entry<String, Value> entry : operation.getArguments().entrySet()) {
+            writer.beginObject();
+            writer.name("name");
+            writer.value(entry.getKey());
+            writer.name("value");
+            entry.getValue().writeJson(writer);
+            writer.endObject();
         }
         writer.endArray();
         if (!operation.getOperations().isEmpty()) {

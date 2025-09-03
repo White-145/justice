@@ -31,7 +31,7 @@ public class PotionValue implements Value {
     @Override
     public void write(Writer writer) throws IOException {
         writer.write("potion{ ");
-        Value.writeString(writer, name);
+        Value.writeEnclosed(writer, name, "\"");
         if (amplifier != 0) {
             writer.write(", amplifier=");
             writer.write(Integer.toString(amplifier));

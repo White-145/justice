@@ -6,20 +6,20 @@ import java.io.IOException;
 import java.io.Writer;
 
 public class VariableValue implements Value {
-    private final VariableScope scope;
     private final String name;
+    private final VariableScope scope;
 
-    public VariableValue(VariableScope scope, String name) {
-        this.scope = scope;
+    public VariableValue(String name, VariableScope scope) {
         this.name = name;
-    }
-
-    public VariableScope getScope() {
-        return scope;
+        this.scope = scope;
     }
 
     public String getName() {
         return name;
+    }
+
+    public VariableScope getScope() {
+        return scope;
     }
 
     @Override

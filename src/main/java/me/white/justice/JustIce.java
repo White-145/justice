@@ -22,11 +22,11 @@ public class JustIce {
                 .argName("file")
             .get();
     private static final Option PARSE_OPTION = Option.builder("p")
-            .desc("Parse provided files")
+            .desc("Parse provided files (source -> module)")
             .longOpt("parse")
             .get();
     private static final Option MARSHAL_OPTION = Option.builder("m")
-            .desc("Marshal provided files")
+            .desc("Marshal provided files (module -> source)")
             .longOpt("marshal")
             .get();
     private static final Option COMPACT_OPTION = Option.builder("c")
@@ -63,7 +63,7 @@ public class JustIce {
             JustIce program = new JustIce(commandLine);
             program.start();
         } catch (ParseException e) {
-            System.err.print("Could not parse command line arguments: " + e);
+            System.out.println(e.getMessage());
         }
     }
 
@@ -104,7 +104,7 @@ public class JustIce {
             try {
                 paths[i] = Path.of(files[i]);
             } catch (InvalidPathException e) {
-                System.err.print("Invalid file path '" + files[i] + "': " + e);
+                System.err.print("Invalid file path '" + files[i] + "': " + e.getMessage());
                 return;
             }
         }
@@ -123,7 +123,7 @@ public class JustIce {
         try {
             HelpFormatter.builder().setShowSince(false).get().printHelp("justice", null, COMMAND_LINE_OPTIONS, null, true);
         } catch (IOException e) {
-            System.err.print("Could not display help message: " + e);
+            System.err.print("Could not display help message: " + e.getMessage());
         }
     }
 
@@ -174,7 +174,7 @@ public class JustIce {
                     break dialogue;
                 }
             }
-            System.out.print("[WRATH/GREED/ENVY/LUST/SLOTH/PRIDE/GLUTTONY]: ");
+            System.out.print("[" + String.join("/", sins) + "]");
         }
         int idx;
         for (idx = 0; idx < sins.length; ++idx) {
@@ -220,7 +220,7 @@ public class JustIce {
         try (FileWriter file = new FileWriter(out)) {
             parser.write(file);
         } catch (IOException e) {
-            System.err.print("Could not write file '" + out + "': " + e);
+            System.err.print("Could not write file '" + out + "': " + e.getMessage());
         }
     }
 
@@ -248,7 +248,7 @@ public class JustIce {
         try (FileWriter writer = new FileWriter(out)) {
             marshal.write(writer);
         } catch (IOException e) {
-            System.err.print("Could not write file '" + out + "': " + e);
+            System.err.print("Could not write file '" + out + "': " + e.getMessage());
         }
     }
 
@@ -258,7 +258,7 @@ public class JustIce {
         } catch (NoSuchFileException e) {
             System.err.println("File '" + path + "' does not exist");
         } catch (IOException e) {
-            System.err.println("Could not read file '" + path + "': " + e);
+            System.err.println("Could not read file '" + path + "': " + e.getMessage());
         }
         return null;
     }

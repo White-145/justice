@@ -19,16 +19,16 @@ public interface Value {
             }
         }
         if (force) {
-            writer.write("`" + name.replace("\n", "\\n").replace("\\", "\\\\").replace("`", "\\`") + "`");
+            writeEnclosed(writer, name, "`");
         } else {
             writer.write(name);
         }
     }
 
-    static void writeString(Writer writer, String string) throws IOException {
-        writer.write("\"");
-        writer.write(string.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\t", "\\t"));
-        writer.write("\"");
+    static void writeEnclosed(Writer writer, String string, String close) throws IOException {
+        writer.write(close);
+        writer.write(string.replace("\\", "\\\\").replace(close, "\\" + close).replace("\n", "\\n"));
+        writer.write(close);
     }
 
     static void writeNumber(Writer writer, double number) throws IOException {

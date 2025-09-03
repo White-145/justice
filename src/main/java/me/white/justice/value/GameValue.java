@@ -1,29 +1,32 @@
 package me.white.justice.value;
 
 import com.google.gson.stream.JsonWriter;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.Writer;
 
 public class GameValue implements Value {
-    private final String selector;
     private final String name;
+    @Nullable
+    private final String selector;
 
-    public GameValue(String selector, String name) {
-        this.selector = selector;
+    public GameValue(String name, String selector) {
         this.name = name;
+        this.selector = selector;
     }
 
     public boolean hasSelector() {
         return selector != null;
     }
 
-    public String getSelector() {
-        return selector;
-    }
-
     public String getName() {
         return name;
+    }
+
+    @Nullable
+    public String getSelector() {
+        return selector;
     }
 
     @Override

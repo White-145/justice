@@ -18,9 +18,7 @@ public class EnumValue implements Value {
 
     @Override
     public void write(Writer writer) throws IOException {
-        writer.write("'");
-        writer.write(name.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\t", "\\t"));
-        writer.write("'");
+        Value.writeEnclosed(writer, name, "'");
     }
 
     @Override

@@ -38,7 +38,7 @@ public enum ValueType {
             if (parsing == null) {
                 throw new MarshalException("Invalid text parsing");
             }
-            return new TextValue(parsing, text);
+            return new TextValue(text, parsing);
         }
     },
     ARRAY("array", false) {
@@ -63,7 +63,7 @@ public enum ValueType {
             if (scope == null) {
                 throw new MarshalException("Invalid variable scope");
             }
-            return new VariableValue(scope, name);
+            return new VariableValue(name, scope);
         }
     },
     GAME("game_value", false) {
@@ -72,10 +72,10 @@ public enum ValueType {
             String name = object.get("game_value").getAsString();
             String selector = object.get("selection").getAsString();
             if (selector.equals("null")) {
-                return new GameValue(null, name);
+                return new GameValue(name, null);
             }
             selector = selector.substring(10, selector.length() - 2);
-            return new GameValue(selector, name);
+            return new GameValue(name, selector);
         }
     },
     LOCATION("location", true) {
@@ -232,7 +232,12 @@ public enum ValueType {
                 seenComponents.add(component);
                 lexer.expect(TokenType.EQUALS);
                 switch (component) {
-                    case "amplifier" -> amplifier = (int)lexer.expect(TokenType.NUMBER).getValue();
+                    case "amplifier" -> {
+                        amplifier = (int)lexer.expect(TokenType.NUMBER).getValue();
+                        if (amplifier < 0) {
+                            throw new ParsingException("Negative potion amplifier");
+                        }
+                    }
                     case "duration" -> duration = (int)lexer.expect(TokenType.NUMBER).getValue();
                     default -> throw new ParsingException("Invalid potion component '" + component + "'");
                 }

@@ -53,7 +53,7 @@ public class ItemValue implements Value {
                 writer.write("{");
                 int i = 0;
                 for (Map.Entry<String, Tag<?>> entry : compound.entrySet()) {
-                    Value.writeString(writer, entry.getKey());
+                    Value.writeEnclosed(writer, entry.getKey(), "\"");
                     writer.write(": ");
                     writeTag(writer, entry.getValue());
                     i += 1;

@@ -38,19 +38,14 @@ public class Marshal {
         if (type == null) {
             throw new MarshalException("Invalid handler type '" + typeString + "'");
         }
-        String name;
-        if (type == HandlerType.EVENT) {
-            name = jsonGet(handler, "event").getAsString();
-        } else {
-            name = jsonGet(handler, "name").getAsString();
-        }
+        String name = jsonGet(handler, type.getNameField()).getAsString();
         List<Operation> operations = new ArrayList<>();
         JsonArray operationsArray = jsonGet(handler, "operations").getAsJsonArray();
         for (JsonElement element : operationsArray) {
             JsonObject operation = element.getAsJsonObject();
             operations.add(marshalOperation(operation));
         }
-        return new Handler(type, name, operations);
+        return new Handler(name, type, operations);
     }
 
     public static Operation marshalOperation(JsonObject operation) throws MarshalException {
@@ -90,7 +85,7 @@ public class Marshal {
                 operations.add(marshalOperation(operationObject));
             }
         }
-        return new Operation(isInverted, name, selector, arguments, operations, delegate);
+        return new Operation(name, isInverted, delegate, selector, arguments, operations);
     }
 
     public static Value marshalValue(JsonObject value, boolean allowArrays) throws MarshalException {

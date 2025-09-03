@@ -6,20 +6,20 @@ import java.io.IOException;
 import java.io.Writer;
 
 public class TextValue implements Value {
-    private final TextParsing textParsing;
     private final String text;
+    private final TextParsing textParsing;
 
-    public TextValue(TextParsing textParsing, String text) {
-        this.textParsing = textParsing;
+    public TextValue(String text, TextParsing textParsing) {
         this.text = text;
-    }
-
-    public TextParsing getTextParsing() {
-        return textParsing;
+        this.textParsing = textParsing;
     }
 
     public String getText() {
         return text;
+    }
+
+    public TextParsing getTextParsing() {
+        return textParsing;
     }
 
     @Override
@@ -27,7 +27,7 @@ public class TextValue implements Value {
         if (textParsing != TextParsing.PLAIN) {
             writer.write(textParsing.getPrefix());
         }
-        Value.writeString(writer, text);
+        Value.writeEnclosed(writer, text, "\"");
     }
 
     @Override

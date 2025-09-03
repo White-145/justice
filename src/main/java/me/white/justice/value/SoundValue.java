@@ -1,6 +1,7 @@
 package me.white.justice.value;
 
 import com.google.gson.stream.JsonWriter;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.Writer;
@@ -9,7 +10,9 @@ public class SoundValue implements Value {
     private final String name;
     private final double volume;
     private final double pitch;
+    @Nullable
     private final String source;
+    @Nullable
     private final String variant;
 
     public SoundValue(String name, double volume, double pitch, String source, String variant) {
@@ -18,6 +21,14 @@ public class SoundValue implements Value {
         this.pitch = pitch;
         this.source = source;
         this.variant = variant;
+    }
+
+    public boolean hasSource() {
+        return source != null;
+    }
+
+    public boolean hasVariant() {
+        return variant != null;
     }
 
     public String getName() {
@@ -32,18 +43,12 @@ public class SoundValue implements Value {
         return pitch;
     }
 
-    public boolean hasSource() {
-        return source != null;
-    }
-
+    @Nullable
     public String getSource() {
         return source;
     }
 
-    public boolean hasVariant() {
-        return variant != null;
-    }
-
+    @Nullable
     public String getVariant() {
         return variant;
     }
@@ -51,7 +56,7 @@ public class SoundValue implements Value {
     @Override
     public void write(Writer writer) throws IOException {
         writer.write("sound{ ");
-        Value.writeString(writer, name);
+        Value.writeEnclosed(writer, name, "\"");
         if (volume != 1) {
             writer.write(", volume=");
             Value.writeNumber(writer, volume);

@@ -1,14 +1,16 @@
 package me.white.justice;
 
 public enum HandlerType {
-    FUNCTION("function"),
-    PROCESS("process"),
-    EVENT("event");
+    FUNCTION("function", "name"),
+    PROCESS("process", "name"),
+    EVENT("event", "event");
 
     final String name;
+    final String nameField;
 
-    HandlerType(String name) {
+    HandlerType(String name, String nameField) {
         this.name = name;
+        this.nameField = nameField;
     }
 
     public static HandlerType byName(String name) {
@@ -22,5 +24,9 @@ public enum HandlerType {
 
     public String getName() {
         return name;
+    }
+
+    public String getNameField() {
+        return nameField;
     }
 }

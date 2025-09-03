@@ -1,12 +1,14 @@
 package me.white.justice.value;
 
 import com.google.gson.stream.JsonWriter;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.Writer;
 
 public class ParticleValue implements Value {
     private final String name;
+    @Nullable
     private final String material;
     private final double spreadH;
     private final double spreadV;
@@ -30,14 +32,15 @@ public class ParticleValue implements Value {
         this.size = size;
     }
 
-    public String getName() {
-        return name;
-    }
-
     public boolean hasMaterial() {
         return material != null;
     }
 
+    public String getName() {
+        return name;
+    }
+
+    @Nullable
     public String getMaterial() {
         return material;
     }
@@ -85,7 +88,7 @@ public class ParticleValue implements Value {
     @Override
     public void write(Writer writer) throws IOException {
         writer.write("particle{ ");
-        Value.writeString(writer, name);
+        Value.writeEnclosed(writer, name, "\"");
         if (hasMaterial()) {
             writer.write(", material=\"");
             writer.write(material);

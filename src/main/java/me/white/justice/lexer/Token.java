@@ -1,7 +1,10 @@
 package me.white.justice.lexer;
 
+import org.jetbrains.annotations.Nullable;
+
 public class Token {
     private final TokenType type;
+    @Nullable
     private final Object value;
     private final int pos;
     private final int row;
@@ -19,10 +22,12 @@ public class Token {
         return type;
     }
 
+    @Nullable
     public Object getValue() {
         return value;
     }
 
+    @Nullable
     public String getString() {
         if (!type.isString()) {
             return null;

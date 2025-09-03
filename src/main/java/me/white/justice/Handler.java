@@ -3,22 +3,22 @@ package me.white.justice;
 import java.util.List;
 
 public class Handler {
-    private final HandlerType type;
     private final String name;
+    private final HandlerType type;
     private final List<Operation> operations;
 
-    public Handler(HandlerType type, String name, List<Operation> operations) {
-        this.type = type;
+    public Handler(String name, HandlerType type, List<Operation> operations) {
         this.name = name;
+        this.type = type;
         this.operations = operations;
-    }
-
-    public HandlerType getType() {
-        return type;
     }
 
     public String getName() {
         return name;
+    }
+
+    public HandlerType getType() {
+        return type;
     }
 
     public List<Operation> getOperations() {

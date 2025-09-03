@@ -1,34 +1,37 @@
 package me.white.justice.value;
 
 import com.google.gson.stream.JsonWriter;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.Writer;
 
 public class NumberValue implements Value {
-    private final String placeholder;
     private final double number;
-
-    public NumberValue(String placeholder) {
-        this.placeholder = placeholder;
-        number = 0;
-    }
+    @Nullable
+    private final String placeholder;
 
     public NumberValue(double number) {
         placeholder = null;
         this.number = number;
     }
 
+    public NumberValue(String placeholder) {
+        this.placeholder = placeholder;
+        number = 0;
+    }
+
     public boolean isPlaceholder() {
         return placeholder != null;
     }
 
-    public String getPlaceholder() {
-        return placeholder;
-    }
-
     public double getNumber() {
         return number;
+    }
+
+    @Nullable
+    public String getPlaceholder() {
+        return placeholder;
     }
 
     @Override
