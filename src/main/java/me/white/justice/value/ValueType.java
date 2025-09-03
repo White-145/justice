@@ -76,7 +76,8 @@ public enum ValueType {
             if (selector.equals("null")) {
                 return new GameValue(name, null);
             }
-            selector = selector.substring(10, selector.length() - 2);
+            // {"type":"<>"}
+            selector = selector.substring(9, selector.length() - 2);
             return new GameValue(name, selector);
         }
     },
@@ -159,6 +160,9 @@ public enum ValueType {
         @Override
         public Value marshal(JsonObject object) throws MarshalException {
             String serialized = object.get("item").getAsString();
+            if (serialized.equals("AAAAAAAAAAA=")) {
+                return null;
+            }
             byte[] bytes = Base64.getDecoder().decode(serialized);
             Tag<?> item;
             try {
