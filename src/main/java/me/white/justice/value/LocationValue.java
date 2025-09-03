@@ -32,16 +32,16 @@ public class LocationValue implements Value {
         return z;
     }
 
-    public boolean hasRotation() {
-        return yaw != 0 || pitch != 0;
-    }
-
     public double getYaw() {
         return yaw;
     }
 
     public double getPitch() {
         return pitch;
+    }
+
+    public boolean hasRotation() {
+        return yaw != 0 || pitch != 0;
     }
 
     @Override

@@ -9,22 +9,19 @@ public class Token {
     private final int pos;
     private final int row;
     private final int column;
+    private final int length;
 
-    public Token(TokenType type, Object value, int pos, int row, int column) {
+    public Token(TokenType type, Object value, int pos, int row, int column, int length) {
         this.type = type;
         this.value = value;
         this.pos = pos;
         this.row = row;
         this.column = column;
+        this.length = length;
     }
 
     public TokenType getType() {
         return type;
-    }
-
-    @Nullable
-    public Object getValue() {
-        return value;
     }
 
     @Nullable
@@ -59,6 +56,10 @@ public class Token {
 
     public int getColumn() {
         return column;
+    }
+
+    public int getLength() {
+        return length;
     }
 
     public boolean isOf(TokenType type) {

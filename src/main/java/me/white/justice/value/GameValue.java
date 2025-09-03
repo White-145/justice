@@ -16,10 +16,6 @@ public class GameValue implements Value {
         this.selector = selector;
     }
 
-    public boolean hasSelector() {
-        return selector != null;
-    }
-
     public String getName() {
         return name;
     }
@@ -27,6 +23,10 @@ public class GameValue implements Value {
     @Nullable
     public String getSelector() {
         return selector;
+    }
+
+    public boolean hasSelector() {
+        return selector != null;
     }
 
     @Override

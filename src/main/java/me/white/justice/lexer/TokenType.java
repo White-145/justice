@@ -28,6 +28,10 @@ public enum TokenType {
         this.representation = representation;
     }
 
+    public String getRepresentation() {
+        return representation;
+    }
+
     public boolean isIdentifier() {
         return this == LITERAL || this == IDENTIFIER;
     }

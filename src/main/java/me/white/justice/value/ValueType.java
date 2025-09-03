@@ -8,8 +8,10 @@ import me.white.justice.Marshal;
 import me.white.justice.MarshalException;
 import me.white.justice.ParsingException;
 import me.white.justice.lexer.Lexer;
+import me.white.justice.lexer.Token;
 import me.white.justice.lexer.TokenType;
 import net.querz.nbt.io.NBTDeserializer;
+import net.querz.nbt.io.ParseException;
 import net.querz.nbt.io.SNBTParser;
 import net.querz.nbt.tag.CompoundTag;
 import net.querz.nbt.tag.Tag;
@@ -82,18 +84,18 @@ public enum ValueType {
         @Override
         public Value parse(Lexer lexer) throws ParsingException {
             lexer.expect(TokenType.BLOCK_OPEN);
-            double x = (double)lexer.expect(TokenType.NUMBER).getValue();
+            double x = lexer.expect(TokenType.NUMBER).getNumber();
             lexer.expect(TokenType.COMMA);
-            double y = (double)lexer.expect(TokenType.NUMBER).getValue();
+            double y = lexer.expect(TokenType.NUMBER).getNumber();
             lexer.expect(TokenType.COMMA);
-            double z = (double)lexer.expect(TokenType.NUMBER).getValue();
+            double z = lexer.expect(TokenType.NUMBER).getNumber();
             double yaw = 0;
             double pitch = 0;
             if (!lexer.peek().isOf(TokenType.BLOCK_CLOSE)) {
                 lexer.expect(TokenType.COMMA);
-                yaw = (double)lexer.expect(TokenType.NUMBER).getValue();
+                yaw = lexer.expect(TokenType.NUMBER).getNumber();
                 lexer.expect(TokenType.COMMA);
-                pitch = (double)lexer.expect(TokenType.NUMBER).getValue();
+                pitch = lexer.expect(TokenType.NUMBER).getNumber();
             }
             lexer.expect(TokenType.BLOCK_CLOSE);
             return new LocationValue(x, y, z, yaw, pitch);
@@ -113,11 +115,11 @@ public enum ValueType {
         @Override
         public Value parse(Lexer lexer) throws ParsingException {
             lexer.expect(TokenType.BLOCK_OPEN);
-            double x = (double)lexer.expect(TokenType.NUMBER).getValue();
+            double x = lexer.expect(TokenType.NUMBER).getNumber();
             lexer.expect(TokenType.COMMA);
-            double y = (double)lexer.expect(TokenType.NUMBER).getValue();
+            double y = lexer.expect(TokenType.NUMBER).getNumber();
             lexer.expect(TokenType.COMMA);
-            double z = (double)lexer.expect(TokenType.NUMBER).getValue();
+            double z = lexer.expect(TokenType.NUMBER).getNumber();
             lexer.expect(TokenType.BLOCK_CLOSE);
             return new VectorValue(x, y, z);
         }
@@ -133,15 +135,22 @@ public enum ValueType {
     ITEM("item", true) {
         @Override
         public Value parse(Lexer lexer) throws ParsingException {
+            lexer.revert();
             Tag<?> tag;
             SNBTParser parser = new SNBTParser(lexer.getBuffer().substring(lexer.getReadPos()));
             try {
                 tag = parser.parse(Tag.DEFAULT_MAX_DEPTH, true);
-            } catch (net.querz.nbt.io.ParseException e) {
-                throw new ParsingException("Invalid item data: " + e.getMessage());
+            } catch (ParseException e) {
+                // yes this is what we have to deal with
+                String message = e.getMessage();
+                if (message.contains("<--[HERE]")) {
+                    message = message.substring(0, message.indexOf(" at: "));
+                }
+                lexer.advance(parser.getReadChars() - 1);
+                throw lexer.error(message);
             }
             if (!(tag instanceof CompoundTag)) {
-                throw new ParsingException("Invalid item data");
+                throw lexer.error("Invalid item data");
             }
             lexer.advance(parser.getReadChars() - 1);
             return new ItemValue((CompoundTag)tag);
@@ -167,7 +176,7 @@ public enum ValueType {
         @Override
         public Value parse(Lexer lexer) throws ParsingException {
             lexer.expect(TokenType.BLOCK_OPEN);
-            String name = (String)lexer.expect(TokenType.STRING).getValue();
+            String name = lexer.expect(TokenType.STRING).getString();
             double volume = 1;
             double pitch = 1;
             String source = null;
@@ -175,18 +184,19 @@ public enum ValueType {
             Set<String> seenComponents = new HashSet<>();
             while (lexer.hasNext() && !lexer.peek().isOf(TokenType.BLOCK_CLOSE)) {
                 lexer.expect(TokenType.COMMA);
-                String component = (String)lexer.expect(TokenType.LITERAL).getValue();
+                Token componentToken = lexer.expect(TokenType.LITERAL);
+                String component = componentToken.getString();
                 if (seenComponents.contains(component)) {
-                    throw new ParsingException("Duplicate sound component '" + component + "'");
+                    throw lexer.error(componentToken, "Duplicate sound component");
                 }
                 seenComponents.add(component);
                 lexer.expect(TokenType.EQUALS);
                 switch (component) {
-                    case "volume" -> volume = (double)lexer.expect(TokenType.NUMBER).getValue();
-                    case "pitch" -> pitch = (double)lexer.expect(TokenType.NUMBER).getValue();
-                    case "source" -> source = (String)lexer.expect(TokenType.STRING).getValue();
-                    case "variant" -> variant = (String)lexer.expect(TokenType.STRING).getValue();
-                    default -> throw new ParsingException("Invalid sound component '" + component + "'");
+                    case "volume" -> volume = lexer.expect(TokenType.NUMBER).getNumber();
+                    case "pitch" -> pitch = lexer.expect(TokenType.NUMBER).getNumber();
+                    case "source" -> source = lexer.expect(TokenType.STRING).getString();
+                    case "variant" -> variant = lexer.expect(TokenType.STRING).getString();
+                    default -> throw lexer.error(componentToken, "Invalid sound component");
                 }
             }
             lexer.expect(TokenType.BLOCK_CLOSE);
@@ -219,27 +229,29 @@ public enum ValueType {
         @Override
         public Value parse(Lexer lexer) throws ParsingException {
             lexer.expect(TokenType.BLOCK_OPEN);
-            String name = (String)lexer.expect(TokenType.STRING).getValue();
+            String name = lexer.expect(TokenType.STRING).getString();
             int amplifier = 0;
             int duration = -1;
             Set<String> seenComponents = new HashSet<>();
             while (lexer.hasNext() && !lexer.peek().isOf(TokenType.BLOCK_CLOSE)) {
                 lexer.expect(TokenType.COMMA);
-                String component = (String)lexer.expect(TokenType.LITERAL).getValue();
+                Token componentToken = lexer.expect(TokenType.LITERAL);
+                String component = componentToken.getString();
                 if (seenComponents.contains(component)) {
-                    throw new ParsingException("Duplicate potion component '" + component + "'");
+                    throw lexer.error(componentToken, "Duplicate potion component");
                 }
                 seenComponents.add(component);
                 lexer.expect(TokenType.EQUALS);
                 switch (component) {
                     case "amplifier" -> {
-                        amplifier = (int)lexer.expect(TokenType.NUMBER).getValue();
+                        Token amplifierToken = lexer.expect(TokenType.NUMBER);
+                        amplifier = amplifierToken.getInteger();
                         if (amplifier < 0) {
-                            throw new ParsingException("Negative potion amplifier");
+                            throw lexer.error(amplifierToken, "Negative potion amplifier");
                         }
                     }
-                    case "duration" -> duration = (int)lexer.expect(TokenType.NUMBER).getValue();
-                    default -> throw new ParsingException("Invalid potion component '" + component + "'");
+                    case "duration" -> duration = lexer.expect(TokenType.NUMBER).getInteger();
+                    default -> throw lexer.error(componentToken, "Invalid potion component");
                 }
             }
             lexer.expect(TokenType.BLOCK_CLOSE);
@@ -258,7 +270,7 @@ public enum ValueType {
         @Override
         public Value parse(Lexer lexer) throws ParsingException {
             lexer.expect(TokenType.BLOCK_OPEN);
-            String name = (String)lexer.expect(TokenType.STRING).getValue();
+            String name = lexer.expect(TokenType.STRING).getString();
             String material = null;
             double spreadH = 0;
             double spreadV = 0;
@@ -271,34 +283,35 @@ public enum ValueType {
             Set<String> seenComponents = new HashSet<>();
             while (lexer.hasNext() && !lexer.peek().isOf(TokenType.BLOCK_CLOSE)) {
                 lexer.expect(TokenType.COMMA);
-                String component = (String)lexer.expect(TokenType.LITERAL).getValue();
+                Token componentToken = lexer.expect(TokenType.LITERAL);
+                String component = componentToken.getString();
                 if (seenComponents.contains(component)) {
-                    throw new ParsingException("Duplicate particle component '" + component + "'");
+                    throw lexer.error(componentToken, "Duplicate particle component");
                 }
                 seenComponents.add(component);
                 lexer.expect(TokenType.EQUALS);
                 switch (component) {
-                    case "material" -> material = (String)lexer.expect(TokenType.STRING).getValue();
+                    case "material" -> material = lexer.expect(TokenType.STRING).getString();
                     case "spread" -> {
                         lexer.expect(TokenType.BLOCK_OPEN);
-                        spreadH = (double)lexer.expect(TokenType.NUMBER).getValue();
+                        spreadH = lexer.expect(TokenType.NUMBER).getNumber();
                         lexer.expect(TokenType.COMMA);
-                        spreadV = (double)lexer.expect(TokenType.NUMBER).getValue();
+                        spreadV = lexer.expect(TokenType.NUMBER).getNumber();
                         lexer.expect(TokenType.BLOCK_CLOSE);
                     }
                     case "motion" -> {
                         lexer.expect(TokenType.BLOCK_OPEN);
-                        motionX = (double)lexer.expect(TokenType.NUMBER).getValue();
+                        motionX = lexer.expect(TokenType.NUMBER).getNumber();
                         lexer.expect(TokenType.COMMA);
-                        motionY = (double)lexer.expect(TokenType.NUMBER).getValue();
+                        motionY = lexer.expect(TokenType.NUMBER).getNumber();
                         lexer.expect(TokenType.COMMA);
-                        motionZ = (double)lexer.expect(TokenType.NUMBER).getValue();
+                        motionZ = lexer.expect(TokenType.NUMBER).getNumber();
                         lexer.expect(TokenType.BLOCK_CLOSE);
                     }
-                    case "count" -> count = (int)lexer.expect(TokenType.NUMBER).getValue();
-                    case "color" -> color = (int)lexer.expect(TokenType.COLOR).getValue();
-                    case "size" -> size = (double)lexer.expect(TokenType.NUMBER).getValue();
-                    default -> throw new ParsingException("Invalid particle component '" + component + "'");
+                    case "count" -> count = lexer.expect(TokenType.NUMBER).getInteger();
+                    case "color" -> color = lexer.expect(TokenType.COLOR).getInteger();
+                    case "size" -> size = lexer.expect(TokenType.NUMBER).getNumber();
+                    default -> throw lexer.error(componentToken, "Invalid particle component");
                 }
             }
             lexer.expect(TokenType.BLOCK_CLOSE);

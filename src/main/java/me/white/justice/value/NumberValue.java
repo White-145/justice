@@ -21,10 +21,6 @@ public class NumberValue implements Value {
         number = 0;
     }
 
-    public boolean isPlaceholder() {
-        return placeholder != null;
-    }
-
     public double getNumber() {
         return number;
     }
@@ -32,6 +28,10 @@ public class NumberValue implements Value {
     @Nullable
     public String getPlaceholder() {
         return placeholder;
+    }
+
+    public boolean isPlaceholder() {
+        return placeholder != null;
     }
 
     @Override

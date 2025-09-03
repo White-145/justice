@@ -1,7 +1,6 @@
 package me.white.justice.value;
 
 import com.google.gson.stream.JsonWriter;
-import net.querz.nbt.io.ParseException;
 
 import java.io.IOException;
 import java.io.Writer;
@@ -31,9 +30,6 @@ public class ArrayValue extends ArrayList<Value> implements Value {
         writer.name("values");
         writer.beginArray();
         for (Value innerValue : this) {
-            if (innerValue instanceof ArrayValue) {
-                throw new ParseException("Recursing array values");
-            }
             innerValue.writeJson(writer);
         }
         writer.endArray();

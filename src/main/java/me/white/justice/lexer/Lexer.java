@@ -10,9 +10,9 @@ public class Lexer {
     private final String buffer;
     private Token pending;
     private Token eof = null;
-    private int pos = -1;
-    private int row = 0;
-    private int column = 0;
+    private int pos = 0;
+    private int row = 1;
+    private int column = 1;
 
     static {
         SIMPLE_TOKENS.put('{', TokenType.BLOCK_OPEN);
@@ -28,7 +28,6 @@ public class Lexer {
 
     public Lexer(String buffer) {
         this.buffer = buffer.replace("\r\n", "\n");
-        advance(1);
     }
 
     public static boolean isLiteralStart(char ch) {
@@ -84,7 +83,25 @@ public class Lexer {
         return column;
     }
 
+    public void revert() {
+        if (pending != null) {
+            pos = pending.getPos();
+            row = pending.getRow();
+            column = pending.getColumn();
+            pending = null;
+        }
+    }
+
     public void advance(int advance) {
+        String advanced = buffer.substring(pos, pos + advance);
+        String stripped = advanced.replace("\n", "");
+        int rows = advanced.length() - stripped.length();
+        if (rows != 0) {
+            row += rows;
+            column = advanced.length() - advanced.lastIndexOf('\n');
+        } else {
+            column += advance;
+        }
         pos += advance;
     }
 
@@ -128,7 +145,7 @@ public class Lexer {
             if (ch == '\\') {
                 pos += 1;
                 if (!canRead()) {
-                    throw new ParsingException("Incomplete escape sequence");
+                    throw error("Incomplete escape sequence");
                 }
                 ch = buffer.charAt(pos);
                 if (ch == '\n') {
@@ -136,14 +153,14 @@ public class Lexer {
                     continue;
                 }
                 if (ch != close && ch != '\\') {
-                    throw new ParsingException("Invalid escape sequence");
+                    throw error("Invalid escape sequence");
                 }
             }
             builder.append(ch);
             pos += 1;
         }
         if (!canRead() || buffer.charAt(pos) != close) {
-            throw new ParsingException("Incomplete " + name);
+            throw error("Incomplete " + name);
         }
         pos += 1;
         advanceFrom(start);
@@ -182,7 +199,7 @@ public class Lexer {
                 hasE = true;
                 pos += 1;
                 if (!canRead()) {
-                    throw new ParsingException("Incomplete number");
+                    throw error("Incomplete number");
                 }
                 ch = buffer.charAt(pos);
                 if (ch != '-' && ch != '+' && (ch < '0' || ch > '9')) {
@@ -200,7 +217,7 @@ public class Lexer {
             advance(advance);
             return number;
         } catch (NumberFormatException e) {
-            throw new ParsingException("Invalid number: " + e.getMessage());
+            throw error("Invalid number: " + e.getMessage());
         }
     }
 
@@ -216,7 +233,7 @@ public class Lexer {
             if (ch == ')') {
                 depth -= 1;
                 if (depth < 0) {
-                    throw new ParsingException("Malformed placeholder");
+                    throw error("Malformed placeholder");
                 }
             }
             if ((ch == ')' || ch == '%') && depth == 0) {
@@ -225,7 +242,7 @@ public class Lexer {
             pos += 1;
         }
         if (!canRead()) {
-            throw new ParsingException("Incomplete placeholder");
+            throw error("Incomplete placeholder");
         }
         pos += 1;
         String placeholder = buffer.substring(start, pos);
@@ -239,7 +256,7 @@ public class Lexer {
         pos += 1;
         for (int i = 0; i < 6; ++i) {
             if (!canRead()) {
-                throw new ParsingException("Incomplete color");
+                throw error("Incomplete color");
             }
             char ch = buffer.charAt(pos);
             color <<= 4;
@@ -250,7 +267,7 @@ public class Lexer {
             } else if (ch >= 'A' && ch <= 'F') {
                 color += ch - 'A' + 10;
             } else {
-                throw new ParsingException("Invalid color component");
+                throw error("Invalid color component");
             }
             pos += 1;
         }
@@ -262,7 +279,7 @@ public class Lexer {
         skipWhitespace();
         if (!canRead()) {
             if (eof == null) {
-                eof = new Token(TokenType.EOF, null, pos, row, column);
+                eof = new Token(TokenType.EOF, null, pos, row, column, 1);
             }
             System.out.println("eof");
             return eof;
@@ -274,19 +291,19 @@ public class Lexer {
         Token token;
         if (SIMPLE_TOKENS.containsKey(ch)) {
             advance(1);
-            token = new Token(SIMPLE_TOKENS.get(ch), null, pos, row, column);
+            token = new Token(SIMPLE_TOKENS.get(ch), null, pos, row, column, 1);
         } else if (isNumberStart(ch)) {
-            token = new Token(TokenType.NUMBER, readNumber(), pos, row, column);
+            token = new Token(TokenType.NUMBER, readNumber(), pos, row, column, this.pos - pos);
         } else if (isLiteralStart(ch)) {
-            token = new Token(TokenType.LITERAL, readLiteral(), pos, row, column);
+            token = new Token(TokenType.LITERAL, readLiteral(), pos, row, column, this.pos - pos);
         } else {
             token = switch (ch) {
-                case '"' -> new Token(TokenType.STRING, readEnclosed('"', "string"), pos, row, column);
-                case '`' -> new Token(TokenType.IDENTIFIER, readEnclosed('`', "identifier"), pos, row, column);
-                case '\'' -> new Token(TokenType.ENUM, readEnclosed('\'', "enum"), pos, row, column);
-                case '%' -> new Token(TokenType.PLACEHOLDER, readPlaceholder(), pos, row, column);
-                case '#' -> new Token(TokenType.COLOR, readColor(), pos, row, column);
-                default -> throw new ParsingException("Invalid token");
+                case '"' -> new Token(TokenType.STRING, readEnclosed('"', "string"), pos, row, column, this.pos - pos);
+                case '`' -> new Token(TokenType.IDENTIFIER, readEnclosed('`', "identifier"), pos, row, column, this.pos - pos);
+                case '\'' -> new Token(TokenType.ENUM, readEnclosed('\'', "enum"), pos, row, column, this.pos - pos);
+                case '%' -> new Token(TokenType.PLACEHOLDER, readPlaceholder(), pos, row, column, this.pos - pos);
+                case '#' -> new Token(TokenType.COLOR, readColor(), pos, row, column, this.pos - pos);
+                default -> throw error("Invalid token");
             };
         }
         skipWhitespace();
@@ -312,7 +329,7 @@ public class Lexer {
     public Token expect(TokenType type) throws ParsingException {
         Token token = read();
         if (!token.isOf(type)) {
-            throw new ParsingException("Expected " + type + ", got " + token.getType());
+            throw error(token, "Expected " + type.getRepresentation());
         }
         return token;
     }
@@ -320,8 +337,40 @@ public class Lexer {
     public Token expectIdentifier() throws ParsingException {
         Token token = read();
         if (!token.getType().isIdentifier()) {
-            throw new ParsingException("Expected identifier-like, got " + token.getType());
+            throw error(token, "Expected identifier-like");
         }
         return token;
+    }
+
+    public ParsingException error(Token token, String message) {
+        return error(token.getPos(), token.getRow(), token.getColumn(), token.getLength(), message);
+    }
+
+    public ParsingException error(String message) {
+        return error(pos, row, column, 1, message);
+    }
+
+    private ParsingException error(int pos, int row, int column, int length, String message) {
+        int lineStart = buffer.substring(0, pos).lastIndexOf('\n') + 1;
+        int lineEnd = buffer.indexOf('\n', pos);
+        if (lineEnd == -1) {
+            lineEnd = buffer.length();
+        }
+        int noticeStart = Math.max(lineStart, pos - 30);
+        int noticeEnd = Math.min(lineEnd, pos + 30);
+        int pointerLength = Math.min(lineEnd - pos, length);
+        if (pointerLength <= 0) {
+            pointerLength = 1;
+        }
+        String position = "(" + row + ":" + column + ") ";
+        String builder = position
+                + buffer.substring(noticeStart, noticeEnd)
+                + "\n"
+                + " ".repeat(position.length() + pos - noticeStart)
+                + "^".repeat(pointerLength)
+                + " ".repeat(Math.max(0, noticeEnd - noticeStart - length))
+                + "\n"
+                + message;
+        return new ParsingException(builder);
     }
 }

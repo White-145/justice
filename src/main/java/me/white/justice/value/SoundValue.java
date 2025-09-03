@@ -23,14 +23,6 @@ public class SoundValue implements Value {
         this.variant = variant;
     }
 
-    public boolean hasSource() {
-        return source != null;
-    }
-
-    public boolean hasVariant() {
-        return variant != null;
-    }
-
     public String getName() {
         return name;
     }
@@ -51,6 +43,14 @@ public class SoundValue implements Value {
     @Nullable
     public String getVariant() {
         return variant;
+    }
+
+    public boolean hasSource() {
+        return source != null;
+    }
+
+    public boolean hasVariant() {
+        return variant != null;
     }
 
     @Override

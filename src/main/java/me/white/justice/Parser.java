@@ -47,6 +47,10 @@ public class Parser {
         }
         lexer.expect(TokenType.BLOCK_OPEN);
         while (lexer.hasNext() && !lexer.peek().isOf(TokenType.BLOCK_CLOSE)) {
+            if (lexer.peek().isOf(TokenType.EOL)) {
+                lexer.read();
+                continue;
+            }
             operations.add(parseOperation(lexer));
         }
         lexer.expect(TokenType.BLOCK_CLOSE);
@@ -66,7 +70,7 @@ public class Parser {
         if (name.isOf(TokenType.LITERAL) && name.getString().equals("not")) {
             isInverted = true;
             if (delegate == null) {
-                throw new ParsingException("Inversion without an action");
+                throw lexer.error(name, "Inversion without an action");
             }
             name = delegate;
             delegate = null;
@@ -116,7 +120,7 @@ public class Parser {
                         lexer.read();
                         TextParsing parsing = TextParsing.byPrefix(prefix);
                         if (parsing == null) {
-                            throw new ParsingException("Invalid text parsing '" + prefix + "'");
+                            throw lexer.error(token, "Invalid text parsing");
                         }
                         yield new TextValue(next.getString(), parsing);
                     }
@@ -124,7 +128,7 @@ public class Parser {
                         lexer.read();
                         VariableScope scope = VariableScope.byPrefix(prefix);
                         if (scope == null) {
-                            throw new ParsingException("Invalid variable scope '" + prefix + "'");
+                            throw lexer.error(token, "Invalid variable scope");
                         }
                         yield new VariableValue(next.getString(), scope);
                     }
@@ -142,7 +146,7 @@ public class Parser {
             case ENUM -> new EnumValue(token.getString());
             case BLOCK_OPEN -> {
                 if (!allowLists) {
-                    throw new ParsingException("Cannot recurse list values");
+                    throw lexer.error(token, "Cannot recurse list values");
                 }
                 ArrayValue values = new ArrayValue();
                 while (lexer.hasNext() && !lexer.peek().isOf(TokenType.BLOCK_CLOSE)) {
@@ -163,7 +167,7 @@ public class Parser {
                 String name = lexer.expectIdentifier().getString();
                 yield new GameValue(name, selector);
             }
-            default -> throw new ParsingException("Invalid value");
+            default -> throw lexer.error(token, "Expected value");
         };
     }
 

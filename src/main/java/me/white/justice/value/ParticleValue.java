@@ -32,10 +32,6 @@ public class ParticleValue implements Value {
         this.size = size;
     }
 
-    public boolean hasMaterial() {
-        return material != null;
-    }
-
     public String getName() {
         return name;
     }
@@ -83,6 +79,10 @@ public class ParticleValue implements Value {
 
     public double getSize() {
         return size;
+    }
+
+    public boolean hasMaterial() {
+        return material != null;
     }
 
     @Override
